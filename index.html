@@ -1,0 +1,1827 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Observatory — The State of Robotics &amp; AI</title>
+</head>
+<body>
+<style>
+/* ============ tokens ============ */
+:root {
+  --ground:   #0A0F13;
+  --panel:    #101820;
+  --panel-2:  #0D141B;
+  --rule:     #1E2B35;
+  --rule-2:   #2C3D49;
+  --ink:      #DCE4E7;
+  --ink-mid:  #97A7B0;
+  --ink-dim:  #61737E;
+  --accent:   #F0A32E;
+  --accent-q: #4A3618;
+  --good:     #6FC08E;
+  --shadow: 0 1px 0 rgba(255,255,255,.03), 0 12px 32px -18px rgba(0,0,0,.9);
+
+  --face-display: "Avenir Next Condensed", "HelveticaNeue-CondensedBold", "Arial Narrow", sans-serif;
+  --face-body: Charter, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --face-data: "SF Mono", ui-monospace, Menlo, Monaco, "Cascadia Mono", monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --ground:#E9E8E2; --panel:#F5F4EF; --panel-2:#EFEEE7; --rule:#D6D4CA; --rule-2:#BEBBAE;
+    --ink:#171F22; --ink-mid:#4E5A60; --ink-dim:#7E8A8F; --accent:#B06A00; --accent-q:#F0DDBB; --good:#2F7A50;
+    --shadow: 0 1px 0 rgba(255,255,255,.6), 0 10px 26px -20px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="light"] {
+  --ground:#E9E8E2; --panel:#F5F4EF; --panel-2:#EFEEE7; --rule:#D6D4CA; --rule-2:#BEBBAE;
+  --ink:#171F22; --ink-mid:#4E5A60; --ink-dim:#7E8A8F; --accent:#B06A00; --accent-q:#F0DDBB; --good:#2F7A50;
+  --shadow: 0 1px 0 rgba(255,255,255,.6), 0 10px 26px -20px rgba(0,0,0,.5);
+}
+:root[data-theme="dark"] {
+  --ground:#0A0F13; --panel:#101820; --panel-2:#0D141B; --rule:#1E2B35; --rule-2:#2C3D49;
+  --ink:#DCE4E7; --ink-mid:#97A7B0; --ink-dim:#61737E; --accent:#F0A32E; --accent-q:#4A3618; --good:#6FC08E;
+  --shadow: 0 1px 0 rgba(255,255,255,.03), 0 12px 32px -18px rgba(0,0,0,.9);
+}
+
+* { box-sizing: border-box; }
+/* The app fills the viewport exactly; only the org list and detail pane scroll.
+   Nothing here may depend on a hardcoded masthead height — it wraps. */
+body {
+  margin: 0; background: var(--ground); color: var(--ink);
+  font-family: var(--face-body); font-size: 15px; line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  height: 100vh; height: 100dvh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.num { font-family: var(--face-data); font-variant-numeric: tabular-nums; }
+
+/* ============ frame ============ */
+.masthead {
+  display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap;
+  padding: 16px 26px 14px; border-bottom: 1px solid var(--rule); background: var(--panel-2);
+  flex: 0 0 auto;
+}
+.brand { display: flex; flex-direction: column; gap: 2px; margin-right: auto; }
+.brand h1 {
+  font-family: var(--face-display); text-transform: uppercase;
+  font-size: 30px; letter-spacing: .28em; font-weight: 600; margin: 0; line-height: 1;
+}
+.brand p { margin: 0; font-size: 12.5px; color: var(--ink-dim); font-family: var(--face-data); letter-spacing: .02em; }
+
+.readouts { display: flex; gap: 24px; }
+.readout { display: flex; flex-direction: column; gap: 1px; }
+.readout b { font-family: var(--face-data); font-size: 23px; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; }
+.readout span { font-family: var(--face-display); text-transform: uppercase; letter-spacing: .13em; font-size: 9.5px; color: var(--ink-dim); }
+
+.tools { display: flex; gap: 8px; align-items: center; }
+
+button, .btn {
+  font-family: var(--face-display); text-transform: uppercase; letter-spacing: .13em;
+  font-size: 10.5px; font-weight: 600; color: var(--ink-mid); background: transparent;
+  border: 1px solid var(--rule-2); border-radius: 2px; padding: 7px 12px; cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+button:hover, .btn:hover { color: var(--ink); border-color: var(--ink-dim); }
+button:focus-visible, .btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.btn-key { color: var(--ground); background: var(--accent); border-color: var(--accent); }
+.btn-key:hover { color: var(--ground); background: var(--accent); filter: brightness(1.12); border-color: var(--accent); }
+
+.stage {
+  display: grid; grid-template-columns: minmax(0,1fr) 392px;
+  flex: 1 1 auto; min-height: 0;
+}
+
+/* ============ chart ============ */
+.chart-side { position: relative; display: flex; flex-direction: column; border-right: 1px solid var(--rule); min-width: 0; min-height: 0; }
+/* min-height:0 lets this shrink below the canvas's intrinsic size instead of
+   pushing the page taller; the canvas is measured from it every frame. */
+.canvas-wrap { position: relative; flex: 1 1 auto; min-height: 0; display: grid; place-items: center; padding: 14px; }
+#orrery { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+#orrery.dragging { cursor: grabbing; }
+/* Shift swaps the drag from orbit to pan; show that before the drag starts. */
+#orrery.pan-ready, #orrery.panning { cursor: move; }
+
+/* Kept narrow so it stays clear of the rim labels on the chart's left side. */
+.hud { position: absolute; top: 16px; left: 20px; display: flex; flex-direction: column; gap: 3px; pointer-events: none; max-width: 220px; }
+.hud-line { font-family: var(--face-data); font-size: 10.5px; color: var(--ink-dim); letter-spacing: .04em; }
+.hud-gap { margin-top: 7px; }
+.view-tools { position: absolute; top: 16px; right: 20px; display: flex; gap: 6px; }
+
+/* A hover card, not a tooltip: it stays put long enough to move into and click.
+   The ::after bridge covers the gap between the body and the card so crossing it
+   does not read as leaving. */
+.tip {
+  position: absolute; pointer-events: none; opacity: 0; transform: translate(-50%, -100%) translateY(-14px);
+  background: var(--panel); border: 1px solid var(--rule-2); padding: 11px 12px; width: 326px;
+  border-radius: 2px; box-shadow: var(--shadow); transition: opacity .12s; z-index: 5;
+  display: grid; grid-template-columns: 54px 1fr; gap: 9px 11px; align-items: start;
+}
+/* Click-through until armed: a card that intercepts the pointer blocks the very
+   planets you are moving between. It only becomes interactive once you dwell. */
+.tip.on { opacity: 1; }
+.tip.on.armed { pointer-events: auto; }
+.tip::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 18px; }
+.tip.below { transform: translate(-50%, 0) translateY(14px); }
+.tip.below::after { top: auto; bottom: 100%; }
+.t-kv { display: grid; grid-template-columns: 58px 1fr; gap: 2px 9px; margin: 8px 0 0; }
+.t-kv dt { font-family: var(--face-display); text-transform: uppercase; letter-spacing: .11em;
+  font-size: 8.5px; color: var(--ink-dim); padding-top: 2px; }
+.t-kv dd { margin: 0; font-family: var(--face-data); font-size: 10.5px; color: var(--ink-mid); }
+.t-dim { color: var(--ink-dim); }
+.t-acts { grid-column: 1 / -1; display: flex; gap: 7px; align-items: center;
+  border-top: 1px solid var(--rule); padding-top: 9px; margin-top: 2px; }
+.t-details { padding: 5px 10px; font-size: 9px; }
+/* The website is the primary action, so it gets the filled treatment. */
+.t-visit {
+  font-family: var(--face-display); text-transform: uppercase; letter-spacing: .12em;
+  font-size: 9px; font-weight: 600; text-decoration: none; padding: 6px 11px; border-radius: 2px;
+  color: var(--ground); background: var(--accent); border: 1px solid var(--accent);
+}
+.t-visit:hover { filter: brightness(1.12); }
+.t-visit.is-hidden { display: none; }
+.t-close {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  padding: 4px 7px; font-size: 10px; line-height: 1; border-color: transparent;
+  color: var(--ink-dim); background: transparent;
+}
+.t-close:hover { color: var(--ink); border-color: var(--rule-2); }
+
+/* On a phone the card is nearly as wide as the chart, so floating it over the
+   bodies buries them and swallows the taps meant to dismiss it. Dock it instead. */
+@media (max-width: 980px) {
+  .tip {
+    position: fixed !important;
+    left: 0 !important; right: 0 !important; top: auto !important; bottom: 0 !important;
+    width: auto !important; transform: none !important;
+    max-height: 62dvh; overflow-y: auto;
+    border-left: 0; border-right: 0; border-bottom: 0;
+    border-radius: 8px 8px 0 0; padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    box-shadow: 0 -10px 30px -12px rgba(0,0,0,.7);
+  }
+  .tip::after { display: none; }
+  .t-close { top: 10px; right: 12px; padding: 7px 10px; font-size: 12px; }
+}
+.t-fig {
+  width: 54px; height: 54px; display: grid; place-items: center; overflow: hidden;
+  border: 1px solid var(--rule); border-radius: 2px; background: var(--panel-2);
+}
+.t-fig img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.t-body { min-width: 0; }
+.tip .t-title { font-size: 13.5px; line-height: 1.25; }
+.tip .t-meta { font-family: var(--face-data); font-size: 9.5px; color: var(--ink-dim); margin-top: 3px; letter-spacing: .03em; }
+.tip .t-note { font-size: 12.5px; color: var(--ink-mid); margin-top: 6px; line-height: 1.42;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+
+.underchart { border-top: 1px solid var(--rule); padding: 11px 22px 13px; background: var(--panel-2); flex: 0 0 auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-bottom: 11px; }
+.lg {
+  display: flex; align-items: center; gap: 6px; cursor: pointer; font-family: var(--face-display);
+  text-transform: uppercase; letter-spacing: .1em; font-size: 9.5px; color: var(--ink-dim);
+  background: none; border: 0; padding: 3px 0;
+}
+.lg:hover { color: var(--ink); border: 0; }
+.lg i { width: 7px; height: 7px; border-radius: 50%; display: block; }
+.lg[aria-pressed="true"] { color: var(--ink); }
+.lg[aria-pressed="false"] i { opacity: .22; }
+
+.profile-head { font-family: var(--face-display); text-transform: uppercase; letter-spacing: .13em; font-size: 9.5px; color: var(--ink-dim); margin-bottom: 8px; }
+.profile { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+.pcell { display: flex; flex-direction: column; gap: 5px; }
+.pbar { height: 5px; background: var(--rule); border-radius: 3px; overflow: hidden; display: flex; }
+.pbar span { display: block; height: 100%; }
+.pcell b { font-family: var(--face-data); font-size: 17px; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; }
+.pcell em { font-family: var(--face-display); text-transform: uppercase; letter-spacing: .11em; font-size: 9px; color: var(--ink-dim); font-style: normal; }
+
+/* ============ panel ============ */
+.panel { display: flex; flex-direction: column; background: var(--panel); min-width: 0; min-height: 0; }
+.panel-pad { padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+.search { width: 100%; padding: 9px 11px; background: var(--panel-2); color: var(--ink);
+  border: 1px solid var(--rule-2); border-radius: 2px; font-family: var(--face-data); font-size: 12.5px; }
+.search::placeholder { color: var(--ink-dim); }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 11px; }
+.chip { padding: 4px 9px; font-size: 9.5px; }
+.chip[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-q); }
+
+.list { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
+/* A container, not a button: the row holds both a select target and a real link,
+   which cannot legally nest inside one another. */
+.row {
+  display: grid; grid-template-columns: 3px 22px 1fr auto 20px; gap: 0 10px; align-items: center;
+  padding: 8px 16px 8px 17px; border-bottom: 1px solid var(--rule);
+}
+.row:hover { background: var(--panel-2); }
+.row[aria-current="true"] { background: var(--panel-2); }
+.row-bar { width: 3px; align-self: stretch; border-radius: 2px; }
+.row-glyph { display: grid; place-items: center; opacity: .75; }
+.row-open {
+  display: block; min-width: 0; width: 100%; text-align: left; cursor: pointer;
+  border: 0; padding: 2px 0; background: transparent; color: var(--ink);
+  font-family: var(--face-body); font-size: 15px; font-weight: 400;
+  text-transform: none; letter-spacing: 0;
+}
+.row-open:hover { color: var(--ink); border: 0; }
+.row-link {
+  font-family: var(--face-data); font-size: 13px; text-decoration: none; text-align: center;
+  color: var(--ink-dim); border-radius: 2px; padding: 2px 0;
+}
+.row-link:hover { color: var(--accent); }
+.row-link.is-empty { color: var(--rule-2); }
+.row-title { font-size: 14.5px; line-height: 1.3; }
+.row-meta { font-family: var(--face-data); font-size: 10px; color: var(--ink-dim); letter-spacing: .04em; margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-mat { font-family: var(--face-display); text-transform: uppercase; letter-spacing: .1em; font-size: 8.5px;
+  color: var(--ink-dim); padding-top: 3px; white-space: nowrap; }
+
+/* flex-shrink must stay 0: with it set, the list's flex-grow crushed this pane
+   to a sliver and its max-height was never reached. The list absorbs the
+   shrinking instead — it has min-height:0 and scrolls. */
+.detail { border-top: 1px solid var(--rule-2); background: var(--panel-2); padding: 16px 20px 18px; flex: 0 0 auto; max-height: 64%; overflow-y: auto; }
+.d-head { display: grid; grid-template-columns: 62px 1fr; gap: 12px; align-items: center; margin-bottom: 11px; }
+.d-fig { width: 62px; height: 62px; display: grid; place-items: center; overflow: hidden;
+  border: 1px solid var(--rule); border-radius: 2px; background: var(--panel); }
+.d-fig img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.detail h2 { font-family: var(--face-body); font-size: 20px; line-height: 1.2; margin: 0; font-weight: 600; text-wrap: balance; }
+.detail h2 a { color: var(--ink); text-decoration: none; }
+.detail h2 a:hover { color: var(--accent); }
+.d-ext { font-family: var(--face-data); font-size: 13px; color: var(--ink-dim); vertical-align: 2px; }
+.detail h2 a:hover .d-ext { color: var(--accent); }
+.kv { display: grid; grid-template-columns: 76px 1fr; gap: 3px 12px; font-size: 12.5px; margin-bottom: 13px; }
+.kv dt { font-family: var(--face-display); text-transform: uppercase; letter-spacing: .11em; font-size: 9.5px; color: var(--ink-dim); padding-top: 3px; }
+.kv dd { margin: 0; font-family: var(--face-data); font-size: 11.5px; }
+.detail .note { font-size: 14px; color: var(--ink-mid); margin: 0 0 13px; line-height: 1.55; }
+.detail-acts { display: flex; gap: 7px; flex-wrap: wrap; }
+a { color: var(--accent); }
+
+.ev-head { font-family: var(--face-display); text-transform: uppercase; letter-spacing: .12em; font-size: 9.5px;
+  color: var(--ink-dim); margin: 4px 0 7px; padding-top: 11px; border-top: 1px solid var(--rule); }
+.ev { display: flex; flex-direction: column; gap: 7px; margin-bottom: 13px; }
+.ev-item { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: baseline; font-size: 13px; }
+.ev-item .ev-date { font-family: var(--face-data); font-size: 10px; color: var(--ink-dim); white-space: nowrap; }
+.ev-item button { padding: 2px 5px; font-size: 8.5px; border-color: transparent; }
+.ev-none { font-size: 12.5px; color: var(--ink-dim); margin: 0 0 13px; }
+
+.empty { padding: 40px 22px; text-align: center; color: var(--ink-dim); font-size: 13.5px; }
+
+/* ============ dialogs ============ */
+dialog { border: 1px solid var(--rule-2); background: var(--panel); color: var(--ink);
+  border-radius: 3px; padding: 0; width: min(580px, 92vw); box-shadow: var(--shadow); }
+dialog::backdrop { background: rgba(4,8,11,.72); }
+.dlg-head { padding: 16px 22px; border-bottom: 1px solid var(--rule); }
+.dlg-head h2 { margin: 0; font-family: var(--face-display); text-transform: uppercase; letter-spacing: .2em; font-size: 15px; font-weight: 600; }
+.dlg-body { padding: 18px 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 13px; max-height: 68vh; overflow-y: auto; }
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.field.wide { grid-column: 1 / -1; }
+.field > label .hint { text-transform: none; letter-spacing: 0; font-family: var(--face-body); font-size: 11px; opacity: .8; }
+.field > label { font-family: var(--face-display); text-transform: uppercase; letter-spacing: .12em; font-size: 9.5px; color: var(--ink-dim); }
+.field input, .field select, .field textarea {
+  background: var(--panel-2); color: var(--ink); border: 1px solid var(--rule-2);
+  border-radius: 2px; padding: 8px 10px; font-family: var(--face-data); font-size: 12.5px; width: 100%;
+}
+.field textarea { font-family: var(--face-body); font-size: 14px; resize: vertical; min-height: 62px; }
+.dlg-foot { padding: 14px 22px; border-top: 1px solid var(--rule); display: flex; gap: 8px; justify-content: flex-end; }
+
+@media (max-width: 980px) {
+  /* Stacked, so the page scrolls again and the panes size to content. */
+  body { height: auto; min-height: 100dvh; overflow: visible; }
+  .stage { grid-template-columns: 1fr; }
+  .chart-side { border-right: 0; border-bottom: 1px solid var(--rule); }
+  .canvas-wrap { min-height: min(78vw, 62dvh); }
+  .list { min-height: 240px; }
+  .detail { max-height: none; }
+  .dlg-body { grid-template-columns: 1fr; }
+  .hud { display: none; }
+  .profile { grid-template-columns: repeat(2, 1fr); }
+}
+/* Full screen. Done in CSS rather than the Fullscreen API because iOS Safari
+   refuses requestFullscreen on anything that is not a video; the native call is
+   layered on top where it works, but nothing depends on it. */
+body.immersive { overflow: hidden; }
+body.immersive .masthead,
+body.immersive .panel,
+body.immersive .underchart { display: none; }
+body.immersive .stage { grid-template-columns: 1fr; }
+body.immersive .chart-side { border: 0; }
+body.immersive .canvas-wrap { min-height: 0; }
+body.immersive .hud { display: flex; }
+@media (max-width: 980px) {
+  body.immersive { height: 100dvh; }
+  body.immersive .hud { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .tip { transition: none; } }
+</style>
+
+<header class="masthead">
+  <div class="brand">
+    <h1>Observatory</h1>
+    <p>who is building what in robotics &amp; machine intelligence</p>
+  </div>
+  <div class="readouts">
+    <div class="readout"><b id="r-total">0</b><span>Orgs tracked</span></div>
+    <div class="readout"><b id="r-ship">0</b><span>Shipping</span></div>
+    <div class="readout"><b id="r-proto">0</b><span>Still prototype</span></div>
+  </div>
+  <div class="tools">
+    <button id="btn-export">Export</button>
+    <button id="btn-import">Import</button>
+    <button id="btn-add" class="btn-key">+ Add org</button>
+  </div>
+</header>
+
+<main class="stage">
+  <section class="chart-side">
+    <div class="canvas-wrap">
+      <canvas id="orrery"></canvas>
+      <div class="hud">
+        <div class="hud-line">DRAG TO TILT &middot; SHIFT-DRAG TO PAN</div>
+        <div class="hud-line">SCROLL TO ZOOM</div>
+        <div class="hud-line hud-gap">SHELL = MATURITY</div>
+        <div class="hud-line">BEARING = CATEGORY</div>
+        <div class="hud-line">DIAMETER = SCALE</div>
+        <div class="hud-line hud-gap" id="hud-filter"></div>
+      </div>
+      <div class="view-tools">
+        <button id="btn-reset">Reset view</button>
+        <button id="btn-spin">Pause</button>
+        <button id="btn-sound" aria-pressed="false">Sound</button>
+        <button id="btn-full" aria-pressed="false">Full screen</button>
+      </div>
+      <div class="tip" id="tip">
+        <button class="t-close" id="t-close" aria-label="Close">&#10005;</button>
+        <div class="t-fig" id="t-fig"></div>
+        <div class="t-body" id="t-body"></div>
+        <div class="t-acts">
+          <button class="t-details" id="t-details">Open details</button>
+          <a class="t-visit" id="t-link" target="_blank" rel="noopener noreferrer">Visit website ↗</a>
+        </div>
+      </div>
+    </div>
+    <div class="underchart">
+      <div class="legend" id="legend"></div>
+      <div class="profile-head">Maturity profile &middot; where the field actually sits</div>
+      <div class="profile" id="profile"></div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="panel-pad">
+      <input class="search" id="search" type="search" placeholder="Search orgs, categories, tags, sources…" />
+      <div class="chips" id="chips-branch"></div>
+      <div class="chips" id="chips-maturity"></div>
+    </div>
+    <div class="list" id="list"></div>
+    <div class="detail" id="detail" hidden></div>
+  </aside>
+</main>
+
+<dialog id="dlg">
+  <form method="dialog" id="org-form">
+    <div class="dlg-head"><h2 id="dlg-title">Add organization</h2></div>
+    <div class="dlg-body">
+      <div class="field wide"><label for="f-name">Name</label><input id="f-name" required /></div>
+      <div class="field"><label for="f-branch">Branch</label><select id="f-branch"></select></div>
+      <div class="field"><label for="f-cat">Category</label><select id="f-cat"></select></div>
+      <div class="field"><label for="f-mat">Maturity</label><select id="f-mat"></select></div>
+      <div class="field"><label for="f-scale">Scale (1–5)</label><input id="f-scale" type="number" min="1" max="5" step="1" value="3" /></div>
+      <div class="field"><label for="f-hq">Based in</label><input id="f-hq" placeholder="San Francisco, US" /></div>
+      <div class="field"><label for="f-url">Website</label><input id="f-url" type="url" placeholder="https://" /></div>
+      <div class="field wide"><label for="f-image">Image URL <span class="hint">— optional; replaces the schematic glyph</span></label><input id="f-image" type="url" placeholder="https://…/robot.jpg" /></div>
+      <div class="field wide"><label for="f-tags">Tags</label><input id="f-tags" placeholder="vla, dexterous, open-source" /></div>
+      <div class="field wide"><label for="f-note">What they're actually doing</label><textarea id="f-note" placeholder="One or two lines. What they build, and what's uncertain about them."></textarea></div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" id="btn-cancel">Cancel</button>
+      <button type="submit" class="btn-key">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="ev-dlg">
+  <form method="dialog" id="ev-form">
+    <div class="dlg-head"><h2 id="ev-dlg-title">Attach a source</h2></div>
+    <div class="dlg-body">
+      <div class="field wide"><label for="v-title">Title</label><input id="v-title" required placeholder="π0: A Vision-Language-Action Flow Model" /></div>
+      <div class="field wide"><label for="v-url">Link</label><input id="v-url" type="url" placeholder="https://" /></div>
+      <div class="field"><label for="v-date">Date</label><input id="v-date" type="date" /></div>
+      <div class="field"><label for="v-note">Note</label><input id="v-note" placeholder="optional" /></div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" id="ev-cancel">Cancel</button>
+      <button type="submit" class="btn-key">Attach</button>
+    </div>
+  </form>
+</dialog>
+
+<input type="file" id="file-in" accept="application/json" hidden />
+
+<script>
+(() => {
+"use strict";
+const RAD = Math.PI / 180;
+
+/* ---------- taxonomy ---------- */
+// Radius = maturity. Inner shells are research and orbit fast; outer shells are
+// deployed and barely move. The bunching you see is the story of the field.
+const MATURITY = [
+  { id: "research",   label: "Research",   ring: 0, blurb: "papers, demos, no product" },
+  { id: "prototype",  label: "Prototype",  ring: 1, blurb: "hardware exists, not sold" },
+  { id: "pilot",      label: "Pilot",      ring: 2, blurb: "paying customers, small n" },
+  { id: "production", label: "Production", ring: 3, blurb: "sold as a product" },
+  { id: "scale",      label: "At scale",   ring: 4, blurb: "thousands of units deployed" }
+];
+// Bearing = what they build. Two hemispheres, split at the poles of the compass.
+const BRANCHES = [
+  { id: "models",   label: "Models" },
+  { id: "hardware", label: "Hardware" }
+];
+const CATEGORIES = [
+  { id: "foundation", label: "Foundation, VLA & Control", branch: "models" },
+  { id: "world",      label: "World Models & Sim", branch: "models" },
+  { id: "perception", label: "Perception",         branch: "models" },
+  { id: "humanoid",   label: "Humanoid",           branch: "hardware" },
+  { id: "quadruped",  label: "Quadruped",          branch: "hardware" },
+  { id: "mobile",     label: "Mobile & Wheeled",   branch: "hardware" },
+  { id: "arms",       label: "Arms",               branch: "hardware" },
+  { id: "hands",      label: "Hands & Effectors",  branch: "hardware" },
+  { id: "aerial",     label: "Aerial",             branch: "hardware" },
+  { id: "compute",    label: "Compute & Sensing",  branch: "hardware" }
+];
+
+// Each hemisphere owns half the compass; categories divide their half evenly.
+CATEGORIES.forEach(c => { c.idx = CATEGORIES.indexOf(c); });
+const MODEL_CATS = CATEGORIES.filter(c => c.branch === "models");
+const HW_CATS = CATEGORIES.filter(c => c.branch === "hardware");
+MODEL_CATS.forEach((c, i) => { c.a0 = (i / MODEL_CATS.length) * Math.PI; c.a1 = ((i + 1) / MODEL_CATS.length) * Math.PI; });
+HW_CATS.forEach((c, i) => { c.a0 = Math.PI + (i / HW_CATS.length) * Math.PI; c.a1 = Math.PI + ((i + 1) / HW_CATS.length) * Math.PI; });
+
+const catOf = id => CATEGORIES.find(c => c.id === id) || CATEGORIES[0];
+const matOf = id => MATURITY.find(m => m.id === id) || MATURITY[1];
+
+/* ---------- category glyphs ----------
+   Schematic line art, not photographs. Drawn from primitives in a 48×48 box so
+   they stay crisp at any size and need no network. An org's own `image` URL,
+   if set, is shown instead. */
+const GLYPHS = {
+  humanoid: '<circle cx="24" cy="9" r="5"/><path d="M24 14v16M14 20l10-4 10 4M24 30l-6 12M24 30l6 12"/>',
+  quadruped: '<rect x="12" y="17" width="24" height="10" rx="3"/><path d="M36 19l6-4M16 27v10M22 27v10M30 27v10M36 27v10"/>',
+  mobile: '<rect x="9" y="14" width="30" height="14" rx="2"/><circle cx="17" cy="34" r="5"/><circle cx="31" cy="34" r="5"/>',
+  arms: '<path d="M10 40h12M16 40V26l12-10 10 4"/><circle cx="16" cy="26" r="3"/><circle cx="28" cy="16" r="3"/><path d="M38 20l4 3"/>',
+  hands: '<path d="M14 30V16M20 30V11M26 30V13M32 28V18"/><path d="M11 30h24v6a6 6 0 0 1-6 6H17a6 6 0 0 1-6-6z"/>',
+  aerial: '<path d="M13 13l22 22M35 13L13 35"/><circle cx="12" cy="12" r="5"/><circle cx="36" cy="12" r="5"/><circle cx="12" cy="36" r="5"/><circle cx="36" cy="36" r="5"/>',
+  compute: '<rect x="15" y="15" width="18" height="18" rx="2"/><path d="M21 15v-6M27 15v-6M21 33v6M27 33v6M15 21H9M15 27H9M33 21h6M33 27h6"/>',
+  foundation: '<circle cx="10" cy="24" r="3.5"/><circle cx="24" cy="12" r="3.5"/><circle cx="24" cy="36" r="3.5"/><circle cx="38" cy="24" r="3.5"/><path d="M13 23l8-9M13 25l8 9M27 14l8 8M27 34l8-8M24 16v16"/>',
+  world: '<circle cx="24" cy="24" r="15"/><path d="M9 24h30M24 9c5 5 5 25 0 30M24 9c-5 5-5 25 0 30"/>',
+  perception: '<path d="M6 24s7-11 18-11 18 11 18 11-7 11-18 11S6 24 6 24z"/><circle cx="24" cy="24" r="5"/>',
+  control: '<path d="M6 32c5 0 5-16 10-16s5 16 10 16 5-16 10-16 5 8 6 8"/><path d="M6 40h36"/>'
+};
+function glyphFor(catId, color, size) {
+  return `<svg viewBox="0 0 48 48" width="${size}" height="${size}" aria-hidden="true"
+    fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${GLYPHS[catId] || GLYPHS.compute}</svg>`;
+}
+
+// Hue follows bearing, so the compass and the palette are the same wheel.
+const HUES = CATEGORIES.map((c, i) => Math.round((i / CATEGORIES.length) * 360));
+CATEGORIES.forEach((c, i) => { c.hue = HUES[i]; });
+
+/* ---------- seed ----------
+   A first draft of the field as of my knowledge cutoff, not a source of truth.
+   Maturity is a judgment call; argue with it and edit in place. */
+const SEED = [
+  // name, category, maturity, scale, hq, tags, note
+  ["Physical Intelligence","foundation","prototype",4,"San Francisco, US","vla, cross-embodiment","π0 and successors — flow-matching VLAs on a VLM backbone. The cross-embodiment data mixture is the real asset.","https://www.physicalintelligence.company"],
+  ["Skild AI","foundation","prototype",3,"Pittsburgh, US","vla, generalist","Betting on one 'robot brain' across many embodiments. Pittsburgh/CMU lineage.","https://www.skild.ai"],
+  ["Google DeepMind","foundation","pilot",5,"London, UK","rt-2, gemini-robotics","RT-1/RT-2/RT-X then Gemini Robotics. Also ships MuJoCo and the Menagerie models the whole field uses.","https://deepmind.google"],
+  ["Covariant","foundation","production",3,"Emeryville, US","warehouse, picking","Warehouse picking models. Team and tech largely absorbed by Amazon in 2024.","https://covariant.ai"],
+  ["NVIDIA (GR00T)","foundation","prototype",5,"Santa Clara, US","humanoid, isaac","Humanoid foundation models plus the Isaac stack. Sells to everyone rather than competing on robots.","https://developer.nvidia.com/isaac/gr00t"],
+  ["Generalist AI","foundation","research",2,"US","vla","Early-stage generalist manipulation. Little public product surface yet.","https://generalistai.com"],
+  ["Wayve","foundation","pilot",4,"London, UK","driving, e2e","End-to-end driving models rather than modular AV stacks. Closer to a VLA lab than a car company.","https://wayve.ai"],
+  ["NVIDIA Isaac / Omniverse","world","production",5,"Santa Clara, US","sim, synthetic-data","The default sim and synthetic-data pipeline for a large share of the industry.","https://developer.nvidia.com/isaac"],
+  ["Genesis Embodied AI","world","research",2,"Open collaboration","sim, physics","Generative physics engine aiming at very high sim throughput. Claims worth verifying yourself.","https://genesis-embodied-ai.github.io"],
+  ["World Labs","world","research",3,"US","spatial, 3d","Spatial intelligence and 3D world models. Adjacent to robotics rather than aimed at it.","https://www.worldlabs.ai"],
+  ["Open Robotics / Gazebo","world","production",2,"US","sim, open-source","Gazebo and the ROS ecosystem. Unglamorous, load-bearing infrastructure.","https://gazebosim.org"],
+  ["Meta AI (SAM)","perception","production",5,"Menlo Park, US","segmentation, open","SAM 2 as a labeling and perception backbone. Released rather than sold.","https://ai.meta.com/sam2/"],
+  ["Roboflow","perception","production",2,"Des Moines, US","tooling, datasets","Vision dataset and deployment tooling. Where a lot of applied CV work actually happens.","https://roboflow.com"],
+  ["Luxonis","perception","production",2,"Westminster, US","depth, oak","OAK depth cameras with on-device inference. Cheap enough to design around.","https://www.luxonis.com"],
+  ["ETH Zürich RSL","foundation","research",3,"Zürich, CH","legged, sim2real","The lab behind ANYmal locomotion. Still the reference point for legged control.","https://rsl.ethz.ch"],
+  ["RAI Institute","foundation","research",4,"Cambridge, US","athletic, control","Formerly Boston Dynamics AI Institute. Long-horizon research on athletic intelligence.","https://rai-inst.com"],
+  ["CMU Robotics Institute","foundation","research",4,"Pittsburgh, US","ri, academia","The oldest and largest organisation of its kind, and the lineage behind a sizeable share of the people and companies on this map.","https://www.ri.cmu.edu"],
+  ["Flexion Robotics","foundation","prototype",3,"Zurich, CH","sim-to-real, whole-body","Sells the brain rather than the body: simulation-trained VLA plus low-latency whole-body control, meant to run on other people's humanoids. Spun out of ETH Zurich's RSL, whose head is a co-founder.","https://flexion.ai"],
+  ["Berkeley BAIR","foundation","research",3,"Berkeley, US","rl, imitation","BridgeData, Octo, and a steady stream of the field's shared benchmarks.","https://bair.berkeley.edu"],
+  ["Stanford IRIS","foundation","research",3,"Stanford, US","imitation, aloha","ALOHA and Mobile ALOHA. Proved how far cheap teleop plus imitation can get you.","https://irislab.stanford.edu"],
+
+  ["Tesla (Optimus)","humanoid","pilot",5,"Austin, US","optimus, in-house","Vertically integrated down to actuators and hands. Units are working inside Tesla\u2019s own facilities rather than being sold.","https://www.tesla.com/AI"],
+  ["Figure AI","humanoid","pilot",5,"Sunnyvale, US","helix, bmw","Helix VLA on their own humanoid. BMW pilot is the closest thing to real deployment in the sector.","https://www.figure.ai"],
+  ["1X Technologies","humanoid","prototype",4,"Moss, NO","neo, home","NEO aimed at home rather than industry. Tendon-driven and deliberately soft.","https://www.1x.tech"],
+  ["Agility Robotics","humanoid","pilot",4,"Corvallis, US","digit, logistics","Digit in GXO warehouses. Probably the most real humanoid deployment to date.","https://www.agilityrobotics.com"],
+  ["Apptronik","humanoid","pilot",4,"Austin, US","apollo, mercedes","Apollo, with Mercedes and GXO pilots. Modular actuator strategy.","https://apptronik.com"],
+  ["Unitree","humanoid","production",4,"Hangzhou, CN","g1, h1, cheap","G1 and H1 actually ship, at prices that undercut everyone. Changed what a research humanoid costs.","https://www.unitree.com"],
+  ["Boston Dynamics","humanoid","prototype",5,"Waltham, US","atlas, electric","Electric Atlas replaced the hydraulic one. Hyundai backing, manufacturing intent unproven.","https://bostondynamics.com"],
+  ["Sanctuary AI","humanoid","prototype",3,"Vancouver, CA","phoenix, hydraulic","Phoenix, with unusually capable hydraulic hands. Teleoperation-heavy approach.","https://www.sanctuary.ai"],
+  ["Fourier Intelligence","humanoid","prototype",3,"Shanghai, CN","gr-1, rehab","GR-1 and GR-2, out of a rehabilitation robotics background.","https://www.fftai.com"],
+  ["UBTech","humanoid","pilot",3,"Shenzhen, CN","walker, factory","Walker S in Chinese factory pilots. Public company, so the numbers are checkable.","https://www.ubtrobot.com"],
+  ["Neura Robotics","humanoid","prototype",3,"Metzingen, DE","4ne-1, cognitive","4NE-1 plus cobots. One of the few European humanoid efforts with funding.","https://neura-robotics.com"],
+  ["Galbot","humanoid","prototype",3,"Beijing, CN","retail, wheeled","Wheeled-base humanoid aimed at retail. Well funded domestically.","https://www.galbot.com"],
+  ["Clone Robotics","humanoid","research",1,"Wrocław, PL","musculoskeletal","Synthetic muscle and skeleton rather than motors. Fascinating, very early.","https://clonerobotics.com"],
+
+  ["Boston Dynamics (Spot)","quadruped","production",4,"Waltham, US","spot, inspection","Spot as an industrial inspection product. The category's proof that quadrupeds can be a business.","https://bostondynamics.com/products/spot/"],
+  ["Unitree (quadrupeds)","quadruped","scale",4,"Hangzhou, CN","go2, b2","Go2 at consumer prices. By volume, almost certainly the most-deployed legged robot.","https://www.unitree.com/go2"],
+  ["ANYbotics","quadruped","production",3,"Zürich, CH","anymal, industrial","ANYmal for oil, gas, and power inspection. ETH spinout.","https://www.anybotics.com"],
+  ["Ghost Robotics","quadruped","production",2,"Philadelphia, US","defense, vision-60","Vision 60, mostly defense and perimeter security.","https://www.ghostrobotics.io"],
+  ["Deep Robotics","quadruped","production",3,"Hangzhou, CN","x30, inspection","X30 for inspection and emergency response.","https://www.deeprobotics.cn"],
+
+  ["Tesla (Robotaxi)","mobile","production",5,"Austin, US","robotaxi, fsd, camera-only","Paid service across four metros, fully unsupervised in Houston and Dallas but still carrying a safety driver in the Bay Area. Camera-only with no lidar — the opposite bet to Waymo's.","https://www.tesla.com/robotaxi"],
+  ["Amazon Robotics","mobile","scale",5,"North Reading, US","fulfillment, fleet","Hundreds of thousands of drive units. The largest deployed robot fleet in existence.","https://www.aboutamazon.com/what-we-do/amazon-robotics"],
+  ["Symbotic","mobile","production",4,"Wilmington, US","warehouse, walmart","High-speed warehouse automation, heavily tied to Walmart.","https://www.symbotic.com"],
+  ["AutoStore","mobile","scale",4,"Nedre Vats, NO","grid, storage","Cube storage grids. Boring, profitable, everywhere in European logistics.","https://www.autostoresystem.com"],
+  ["Locus Robotics","mobile","production",3,"Wilmington, US","amr, picking","Collaborative AMRs for warehouse picking. Robots-as-a-service model.","https://locusrobotics.com"],
+  ["Waymo","mobile","production",5,"Mountain View, US","av, robotaxi","Paid driverless service in multiple US cities. Publishes real safety denominators.","https://waymo.com"],
+  ["Zoox","mobile","pilot",4,"Foster City, US","av, purpose-built","Purpose-built vehicle with no manual controls. Amazon-owned, still limited service.","https://zoox.com"],
+  ["Nuro","mobile","pilot",3,"Mountain View, US","delivery, licensing","Pivoted toward licensing its autonomy stack rather than running delivery itself.","https://www.nuro.ai"],
+  ["Serve Robotics","mobile","production",2,"Los Angeles, US","sidewalk, delivery","Sidewalk delivery at real volume in a handful of US cities.","https://www.serverobotics.com"],
+  ["Starship Technologies","mobile","production",2,"San Francisco, US","sidewalk, campus","Campus delivery. Millions of autonomous deliveries, mostly unnoticed.","https://www.starship.xyz"],
+
+  ["FANUC","arms","scale",5,"Oshino, JP","industrial, cnc","The largest industrial arm maker. The baseline everything else is measured against.","https://www.fanuc.com"],
+  ["ABB Robotics","arms","scale",5,"Zürich, CH","industrial, cobot","Industrial arms plus a growing cobot line.","https://new.abb.com/products/robotics"],
+  ["KUKA","arms","scale",4,"Augsburg, DE","industrial, iiwa","Industrial arms and the iiwa force-sensitive line. Midea-owned.","https://www.kuka.com"],
+  ["Universal Robots","arms","scale",4,"Odense, DK","cobot, ur","Created the cobot category. Teradyne-owned.","https://www.universal-robots.com"],
+  ["Franka Robotics","arms","production",2,"Munich, DE","research, torque","Panda/FR3 — the default torque-controlled arm in research labs.","https://franka.de"],
+  ["Doosan Robotics","arms","production",3,"Suwon, KR","cobot","Cobots with strong growth in Asian manufacturing.","https://www.doosanrobotics.com"],
+
+  ["Shadow Robot","hands","production",2,"London, UK","dexterous, research","The Dexterous Hand — the research standard for anthropomorphic manipulation.","https://www.shadowrobot.com"],
+  ["Wonik Robotics","hands","production",2,"Seongnam, KR","allegro","Allegro Hand. Cheap enough that most manipulation labs have one.","https://www.wonikrobotics.com"],
+  ["SCHUNK","hands","scale",3,"Lauffen, DE","grippers, industrial","Industrial grippers and toolchangers at enormous volume. Unsexy, ubiquitous.","https://schunk.com"],
+  ["Robotiq","hands","production",2,"Lévis, CA","cobot, gripper","Plug-and-play grippers for cobots. Made end-effectors an off-the-shelf purchase.","https://robotiq.com"],
+  ["Tesla (Optimus hand)","hands","prototype",4,"Austin, US","tendon, in-house","22-DoF tendon-driven hand developed in-house. The hardest part of Optimus.","https://www.tesla.com/AI"],
+
+  ["DJI","aerial","scale",5,"Shenzhen, CN","drones, consumer","Dominant in consumer and prosumer drones. Increasingly constrained by policy, not engineering.","https://www.dji.com"],
+  ["Skydio","aerial","production",3,"San Mateo, US","autonomy, inspection","Autonomous flight for inspection and defense. Exited consumer.","https://www.skydio.com"],
+  ["Zipline","aerial","scale",4,"South San Francisco, US","delivery, medical","Millions of autonomous delivery miles, mostly medical, mostly in Africa.","https://www.flyzipline.com"],
+  ["Anduril","aerial","production",5,"Costa Mesa, US","defense, lattice","Autonomous defense systems. Growing very fast on government contracts.","https://www.anduril.com"],
+  ["Wing","aerial","pilot",3,"Palo Alto, US","delivery, alphabet","Alphabet's drone delivery arm. Real but geographically narrow.","https://wing.com"],
+
+  ["NVIDIA (Jetson)","compute","scale",5,"Santa Clara, US","edge, thor","Jetson Orin and Thor. The default compute for anything that thinks on-board.","https://developer.nvidia.com/embedded-computing"],
+  ["Qualcomm Robotics","compute","production",4,"San Diego, US","edge, rb","RB-series platforms. Power-efficiency advantage on mobile robots.","https://www.qualcomm.com/products/technology/processors/robotics"],
+  ["Hailo","compute","production",2,"Tel Aviv, IL","npu, edge","Edge AI accelerators. A real alternative where power budgets are tight.","https://hailo.ai"],
+  ["Ouster","compute","production",2,"San Francisco, US","lidar","Digital lidar. Consolidated with Velodyne.","https://ouster.com"],
+  ["Intel RealSense","compute","production",2,"Santa Clara, US","depth","Depth cameras that half of academic robotics is built on. Spun out of Intel.","https://www.intelrealsense.com"],
+
+  ["Toyota Research Institute","foundation","research",4,"Los Altos, US","lbm, manipulation","Large Behavior Models for manipulation, and the lab behind much of the diffusion-policy line of work.","https://www.tri.global"],
+  ["Hugging Face","foundation","production",3,"New York, US","lerobot, open-source","LeRobot, plus Reachy hardware via the Pollen acquisition. The de facto open hub for robot learning.","https://huggingface.co"],
+  ["OpenAI","foundation","research",5,"San Francisco, US","in-house, restarted","Restarted an in-house robotics effort after years of backing others instead. Little public surface yet.","https://openai.com"],
+
+  ["AgiBot (Zhiyuan Robotics)","humanoid","production",4,"Shanghai, CN","mass-production","Claims the earliest real mass production among Chinese humanoid makers. Volumes are hard to verify independently.","https://www.zhiyuan-robot.com"],
+  ["XPeng Robotics","humanoid","prototype",4,"Guangzhou, CN","iron, ev-backed","IRON humanoid funded by the EV business and sharing its supply chain and autonomy stack.","https://www.xpeng.com"],
+  ["Kepler Robotics","humanoid","prototype",2,"Shanghai, CN","forerunner","Forerunner series aimed at industrial work.","https://www.gotokepler.com"],
+  ["EngineAI","humanoid","prototype",2,"Shenzhen, CN","gait","Unusually natural gaits in demo footage. Demos are not deployments.","https://www.engineai.com.cn"],
+  ["K-Scale Labs","humanoid","research",1,"Palo Alto, US","open-source","Open-source humanoid hardware and stack. Small, early, unusually transparent about it.","https://kscale.dev"],
+
+  ["Yaskawa","arms","scale",5,"Kitakyushu, JP","motoman, servo","Motoman arms and the servo business. The fourth of the big four alongside FANUC, ABB and KUKA.","https://www.yaskawa-global.com"],
+  ["Mujin","arms","production",3,"Tokyo, JP","controller, picking","Vendor-agnostic controllers that do the motion planning other people's arms lack.","https://www.mujin.co.jp"],
+  ["Dexterity","arms","pilot",3,"Redwood City, US","truck-loading","Multi-arm systems for truck loading and parcel handling.","https://www.dexterity.ai"],
+  ["RightHand Robotics","arms","production",2,"Somerville, US","piece-picking","Piece-picking for order fulfilment.","https://www.righthandrobotics.com"],
+  ["Intrinsic","arms","pilot",3,"Mountain View, US","alphabet, software","Alphabet's industrial robotics software arm. Trying to make arms programmable without robotics expertise.","https://www.intrinsic.ai"],
+  ["Rainbow Robotics","arms","production",3,"Daejeon, KR","samsung, cobot","Collaborative arms plus humanoid research. Samsung took a controlling stake.","https://www.rainbow-robotics.com"],
+
+  ["Aurora Innovation","mobile","production",4,"Pittsburgh, US","trucking, driverless","Driverless Class 8 trucks hauling commercial freight in Texas.","https://aurora.tech"],
+  ["Pony.ai","mobile","production",4,"Guangzhou, CN","robotaxi","Robotaxi and robotruck operations across several Chinese cities.","https://www.pony.ai"],
+  ["WeRide","mobile","production",4,"Guangzhou, CN","robotaxi, robobus","Robotaxis, buses and street sweepers. Unusually broad vehicle range.","https://www.weride.ai"],
+  ["Baidu Apollo Go","mobile","scale",5,"Beijing, CN","robotaxi, volume","Very high paid ride volume, at fares far below US equivalents.","https://www.apollo.auto"],
+  ["Waabi","mobile","pilot",3,"Toronto, CA","trucking, sim","Simulation-first bet on autonomous trucking.","https://waabi.ai"],
+  ["Kodiak Robotics","mobile","production",3,"Mountain View, US","trucking, defense","Driverless trucking with a growing defense vehicle line.","https://kodiak.ai"],
+  ["Gatik","mobile","pilot",2,"Mountain View, US","middle-mile","Middle-mile box trucks for retail and grocery.","https://gatik.ai"],
+  ["May Mobility","mobile","pilot",2,"Ann Arbor, US","shuttles","Small autonomous shuttles on fixed routes.","https://maymobility.com"],
+  ["Collaborative Robotics","mobile","pilot",3,"Santa Clara, US","proxie","The Proxie mobile robot, and a deliberate refusal to build a humanoid.","https://www.collaborativerobotics.com"],
+  ["Bear Robotics","mobile","production",2,"Redwood City, US","service, servi","Serving robots for restaurants. LG-backed.","https://www.bearrobotics.ai"],
+  ["Nimble Robotics","mobile","production",3,"San Francisco, US","fulfilment","Autonomous fulfilment centres operated as a service.","https://www.nimblerobotics.com"],
+
+  ["Shield AI","aerial","production",4,"San Diego, US","defense, hivemind","The Hivemind autonomy stack and the V-BAT aircraft.","https://shield.ai"],
+  ["Hesai","compute","scale",4,"Shanghai, CN","lidar","Very high lidar volumes, mostly into Chinese EVs.","https://www.hesaitech.com"],
+  ["RoboSense","compute","production",3,"Shenzhen, CN","lidar","Lidar plus perception software for vehicles and robots.","https://www.robosense.ai"],
+
+  ["Sunday Robotics","humanoid","prototype",4,"US","memo, household, aloha","Memo, a household robot, from Tony Zhao and Cheng Chi — the ALOHA and Diffusion Policy authors. $1.15B valuation two years in; first robots targeted for late 2026, so nothing is in homes yet.","https://www.sunday.ai"],
+  ["Walden Robotics","humanoid","pilot",4,"Cambridge, US","lbm, tri-spinout","Toyota Research Institute spinout under Russ Tedrake, commercialising Large Behavior Models. A robot is already working eight-hour shifts in a North American Toyota plant, which puts it ahead of most of this wedge.","https://www.waldenrobotics.com"],
+  ["Rhoda AI","foundation","prototype",4,"US","dva, video-prediction","Direct Video Action models: build a prior on physics from internet-scale video, then post-train on much smaller amounts of robot data. $450M Series A at $1.7B out of 18 months in stealth, aimed at manufacturing and logistics. Nothing deployed yet.","https://www.rhoda.ai"],
+  ["X Square Robot","foundation","prototype",4,"Shenzhen, CN","wall-b, world-model","WALL-B trains perception, language, action and physical prediction in one network rather than bolting a VLA onto separate parts. Notable for taking lead investment from Alibaba, ByteDance, Xiaomi and Meituan across successive rounds.","https://x2robot.com"],
+  ["XDOF","world","production",3,"US","teleoperation, datasets","Sells the unglamorous half of robot learning: teleoperation rigs, data pipelines and annotation for other people's models. Released ABC-130K, an open bimanual manipulation set. Already serving frontier labs, which makes it a rare picks-and-shovels business here.","https://www.xdof.ai"],
+  ["LimX Dynamics","humanoid","production",4,"Shenzhen, CN","luna, pre-ipo","$400M raised in six months at a $2.2B valuation, heading for an IPO. Shipping in volume — the Luna humanoid is going to customers in South Korea and over half its orders are from outside China.","https://www.limxdynamics.com"],
+  ["Proception","hands","prototype",2,"San Francisco, US","prohand, tendon, proglove","ProHand 1.0 — 22 DoF, tendon-driven, skin-like contact sensing — plus ProGlove, which captures human hand data with no robot in the loop. Founder Jay Li led Tesla's Optimus hand work; Tesla's trade-secret suit settled in June 2026.","https://www.proception.ai"]
+];
+
+/* ---------- state ---------- */
+const KEY = "observatory.orgs.v1";
+const REMOVED_KEY = "observatory.removed.v1";
+let orgs = [];
+let selected = null, editing = null, query = "";
+const filters = { branch: new Set(), maturity: new Set(), category: new Set() };
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let spinning = !reduced;
+
+const uid = () => "o" + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
+
+// Seed text that has since been revised. Applied only where the stored note is
+// still character-for-character the old seed, so your own edits always win.
+// Position within a wedge follows array order, so a reordering has to be applied
+// to already-saved copies as well, not just to the seed.
+const ORDER_FIXES = [
+  ["Tesla (Optimus)", "Figure AI"],
+  ["Tesla (Robotaxi)", "Amazon Robotics"]
+];
+
+// Categories that have been folded into another. Applied to every saved org, not
+// just seeded ones, so a hand-added entry in a retired category still lands
+// somewhere real instead of silently falling back to the first wedge.
+const CATEGORY_MOVES = { control: "foundation" };
+
+const CORRECTIONS = [
+  { name: "Tesla (Optimus)", field: "note",
+    was: "Vertically integrated down to actuators and hands. Timeline claims have slipped repeatedly.",
+    now: "Vertically integrated down to actuators and hands." },
+  { name: "Tesla (Optimus)", field: "maturity", was: "prototype", now: "pilot" }
+];
+
+// Saved data predates later fields, so top it up from the seed on every load.
+// Only fills blanks — anything you have edited is left alone.
+function migrate(list) {
+  const seed = new Map(SEED.map(s => [s[0].toLowerCase(), s]));
+  let filled = 0;
+  list.forEach(o => {
+    if (!o || !o.name) return;
+    const s = seed.get(o.name.toLowerCase());
+    if (!o.url && s && s[7]) { o.url = s[7]; filled++; }
+    if (typeof o.image !== "string") o.image = "";
+    if (!Array.isArray(o.tags)) o.tags = [];
+    if (!Array.isArray(o.evidence)) o.evidence = [];
+    if (typeof o.scale !== "number") o.scale = 3;
+  });
+  list.forEach(o => {
+    if (o && CATEGORY_MOVES[o.category]) { o.category = CATEGORY_MOVES[o.category]; filled++; }
+  });
+  CORRECTIONS.forEach(({ name, field, was, now }) => {
+    const o = list.find(x => x && x.name === name);
+    if (o && o[field] === was) { o[field] = now; filled++; }
+  });
+  return filled;
+}
+
+const fromSeed = s => ({
+  id: uid(), name: s[0], category: s[1], maturity: s[2], scale: s[3], hq: s[4],
+  tags: s[5] ? s[5].split(",").map(t => t.trim()).filter(Boolean) : [],
+  note: s[6], url: s[7] || "", image: "", evidence: []
+});
+
+// Orgs you delete must not reappear the next time the seed list grows.
+function removedSet() {
+  try { return new Set(JSON.parse(localStorage.getItem(REMOVED_KEY) || "[]")); }
+  catch (e) { return new Set(); }
+}
+function rememberRemoved(name) {
+  const set = removedSet(); set.add(name.toLowerCase());
+  try { localStorage.setItem(REMOVED_KEY, JSON.stringify([...set])); } catch (e) {}
+}
+
+// Runs after new seed entries are appended: reordering a list that does not yet
+// contain the org being moved is a no-op, and the append lands it at the end.
+function applyOrderFixes(list) {
+  let moved = 0;
+  ORDER_FIXES.forEach(([move, before]) => {
+    const i = list.findIndex(o => o && o.name === move);
+    const j = list.findIndex(o => o && o.name === before);
+    if (i > -1 && j > -1 && i > j) { list.splice(j, 0, list.splice(i, 1)[0]); moved++; }
+  });
+  return moved;
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) {
+      orgs = JSON.parse(raw);
+      const touched = migrate(orgs);
+      // Seed entries added since this browser last saved: append them, unless
+      // they were deliberately deleted here.
+      const have = new Set(orgs.map(o => (o.name || "").toLowerCase()));
+      const gone = removedSet();
+      let added = 0;
+      SEED.forEach(s => {
+        const key = s[0].toLowerCase();
+        if (!have.has(key) && !gone.has(key)) { orgs.push(fromSeed(s)); added++; }
+      });
+      const moved = applyOrderFixes(orgs);
+      if (touched || added || moved) save();
+      return;
+    }
+  } catch (e) { /* seed instead */ }
+  orgs = SEED.map(fromSeed);
+  applyOrderFixes(orgs);
+  save();
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(orgs)); } catch (e) {} }
+
+/* ---------- filtering ---------- */
+function passes(o) {
+  const cat = catOf(o.category);
+  if (filters.branch.size && !filters.branch.has(cat.branch)) return false;
+  if (filters.maturity.size && !filters.maturity.has(o.maturity)) return false;
+  if (filters.category.size && !filters.category.has(o.category)) return false;
+  if (query) {
+    const hay = [o.name, cat.label, o.note, o.hq, (o.tags || []).join(" "),
+      (o.evidence || []).map(e => e.title).join(" ")].join(" ").toLowerCase();
+    if (!hay.includes(query)) return false;
+  }
+  return true;
+}
+const visible = () => orgs.filter(passes);
+
+/* ---------- theme ---------- */
+const theme = {};
+function readTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  const g = n => cs.getPropertyValue(n).trim();
+  theme.ground = g("--ground"); theme.rule2 = g("--rule-2");
+  theme.ink = g("--ink"); theme.dim = g("--ink-dim");
+  theme.accent = g("--accent"); theme.panel2 = g("--panel-2");
+  theme.light = luma(theme.ground) > 0.5;
+  theme.faceDisplay = g("--face-display"); theme.faceData = g("--face-data");
+  theme.cat = CATEGORIES.map(c => theme.light
+    ? `hsl(${c.hue}, 58%, 36%)`
+    : `hsl(${c.hue}, 62%, 66%)`);
+}
+function luma(hex) {
+  const h = hex.replace("#", "");
+  if (h.length < 6) return 0;
+  return (0.2126 * parseInt(h.slice(0,2),16) + 0.7152 * parseInt(h.slice(2,4),16) + 0.0722 * parseInt(h.slice(4,6),16)) / 255;
+}
+function alpha(col, a) {
+  a = Math.max(0, Math.min(1, a));
+  if (col.startsWith("hsl(")) return col.replace("hsl(", "hsla(").replace(")", `, ${a})`);
+  const h = col.replace("#", "");
+  if (h.length < 6) return col;
+  return `rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${a})`;
+}
+const catColor = o => theme.cat[catOf(o.category).idx];
+readTheme();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { readTheme(); renderAll(); });
+new MutationObserver(() => { readTheme(); renderAll(); })
+  .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class", "style"] });
+
+/* ---------- 3D ---------- */
+const cv = document.getElementById("orrery");
+const ctx = cv.getContext("2d");
+const tip = document.getElementById("tip");
+
+// Home is the plan view: straight down, hemispheres split on the horizontal.
+const ZOOM_MIN = 0.25, ZOOM_MAX = 14;
+const HOME = { yaw: Math.PI, pitch: -Math.PI / 2, zoom: 1, panX: 0, panY: 0 };
+const TOPDOWN = Math.PI / 2;
+const cam = { yaw: HOME.yaw, pitch: HOME.pitch, zoom: HOME.zoom, panX: 0, panY: 0 };
+let bodies = [], mouse = null, hovered = null, last = 0;
+let tipFor = null, tipOrg = null, tipHideT = null, tipHot = false;
+let tipArmed = false, armT = null, lastMoveAt = 0, lastMovePt = null;
+const ARM_MS = 320, SWEEP_SPEED = 0.45;   // px per ms that counts as passing through
+let dragging = false, dragMoved = false, dragPrev = null, idleSince = 0, dragMode = "orbit";
+
+// Modest inclinations per shell so the sphere reads as woven, not as flat discs.
+const SHELL_INC = [22, -15, 9, -20, 6];
+const SHELL_NODE = [0, 12, -8, 16, -6];
+
+// The canvas fills its container rather than being forced square: the ring radius
+// comes off the short axis, and the leftover width goes to the rim labels.
+function sizeCanvas(c) {
+  const rect = c.parentElement.getBoundingClientRect();
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const w = Math.max(1, rect.width - 28);
+  const h = Math.max(1, rect.height - 28);
+  c.style.width = w + "px"; c.style.height = h + "px";
+  c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+  c.getContext("2d").setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { w, h };
+}
+
+let VIEW = { cx: 0, cy: 0, dist: 1, focal: 1, sy: 0, cyw: 1, sp: 0, cp: 1 };
+function setView(w, h, R) {
+  VIEW.cx = w / 2 + cam.panX; VIEW.cy = h / 2 + cam.panY;
+  // Zoom is a lens, not a dolly: the camera stays put and the focal length
+  // changes. Pulling the camera in instead would push it inside the sphere past
+  // about 3x, projecting the near half from behind the eye. This also keeps the
+  // depth shading and foreshortening constant across the whole zoom range.
+  VIEW.dist = R * 3.1; VIEW.focal = R * 3.1 * cam.zoom;
+  VIEW.sy = Math.sin(cam.yaw); VIEW.cyw = Math.cos(cam.yaw);
+  VIEW.sp = Math.sin(cam.pitch); VIEW.cp = Math.cos(cam.pitch);
+}
+// Pan headroom scales with magnification, so a body at the rim can still be
+// brought to the middle when zoomed right in.
+function clampPan() {
+  const limX = cv.clientWidth * 0.6 * Math.max(1, cam.zoom);
+  const limY = cv.clientHeight * 0.6 * Math.max(1, cam.zoom);
+  cam.panX = Math.max(-limX, Math.min(limX, cam.panX));
+  cam.panY = Math.max(-limY, Math.min(limY, cam.panY));
+}
+
+function project(x, y, z) {
+  const rx = x * VIEW.cyw - z * VIEW.sy;
+  const rz = x * VIEW.sy + z * VIEW.cyw;
+  const ry = y * VIEW.cp - rz * VIEW.sp;
+  const rz2 = y * VIEW.sp + rz * VIEW.cp;
+  const depth = rz2 + VIEW.dist;
+  const f = VIEW.focal / Math.max(1, depth);
+  return { x: VIEW.cx + rx * f, y: VIEW.cy + ry * f, z: depth, s: f };
+}
+function shellPoint(r, theta, incDeg, nodeDeg) {
+  const x0 = r * Math.cos(theta), z0 = r * Math.sin(theta);
+  const i = incDeg * RAD, n = nodeDeg * RAD;
+  const y1 = -z0 * Math.sin(i), z1 = z0 * Math.cos(i);
+  return { x: x0 * Math.cos(n) - z1 * Math.sin(n), y: y1, z: x0 * Math.sin(n) + z1 * Math.cos(n) };
+}
+
+function draw(dt) {
+  const { w, h } = sizeCanvas(cv);
+  // Rotation stops while you're pointing at the sphere, so bodies aren't moving targets.
+  // Motion is camera-only: yaw rotates the whole scene, so bodies, sector
+  // dividers and labels all stay locked together.
+  const frozen = !!hovered || dragging || tip.classList.contains("on");
+  if (spinning && !frozen && performance.now() - idleSince > 3500) cam.yaw += dt * 0.07;
+
+  // Margin must clear the outermost rim label (branch text at EQ + 34) or it clips.
+  const R = Math.min(w, h) / 2 - 56;
+  const inner = R * 0.26;
+  const step = (R - inner) / (MATURITY.length - 1);
+  setView(w, h, R);
+  ctx.clearRect(0, 0, w, h);
+
+  // Near top-down the shells flatten into one plane, so the maturity rings read
+  // as clean concentric circles. Tilt back and the armillary weave returns.
+  const t = Math.max(0, Math.min(1, (Math.abs(cam.pitch) - 0.95) / (TOPDOWN - 0.95)));
+  const flat = t * t * (3 - 2 * t);
+  const incAt = i => SHELL_INC[i] * (1 - flat);
+  const nodeAt = i => SHELL_NODE[i] * (1 - flat);
+
+  const anyFilter = filters.branch.size || filters.maturity.size || filters.category.size || query;
+  const prims = [];
+  const push = (z, fn) => prims.push({ z, fn });
+  const fade = z => Math.max(0.18, Math.min(1, 1 - (z - VIEW.dist) / (R * 2.1)));
+
+  /* --- compass plane --- */
+  const EQ = R + 12, SEGS = Math.round(Math.max(96, Math.min(384, 96 * Math.sqrt(cam.zoom))));
+  for (let i = 0; i < SEGS; i++) {
+    const a = (i / SEGS) * Math.PI * 2, b = ((i + 1) / SEGS) * Math.PI * 2;
+    const p = project(Math.cos(a) * EQ, 0, Math.sin(a) * EQ);
+    const q = project(Math.cos(b) * EQ, 0, Math.sin(b) * EQ);
+    const mz = (p.z + q.z) / 2;
+    push(mz, () => {
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y);
+      ctx.strokeStyle = alpha(theme.rule2, 0.7 * fade(mz)); ctx.lineWidth = 1; ctx.stroke();
+    });
+  }
+  // Hemisphere split: the two heavy spokes at 0 and π.
+  [0, Math.PI].forEach(a => {
+    const p0 = project(Math.cos(a) * inner * 0.6, 0, Math.sin(a) * inner * 0.6);
+    const p1 = project(Math.cos(a) * (EQ + 6), 0, Math.sin(a) * (EQ + 6));
+    push((p0.z + p1.z) / 2, () => {
+      ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y);
+      ctx.strokeStyle = alpha(theme.dim, 0.5 * fade(p1.z)); ctx.lineWidth = 1.2; ctx.stroke();
+    });
+  });
+  BRANCHES.forEach((br, bi) => {
+    const am = bi === 0 ? Math.PI / 2 : Math.PI * 1.5;
+    const lp = project(Math.cos(am) * (EQ + 34), 0, Math.sin(am) * (EQ + 34));
+    const on = !filters.branch.size || filters.branch.has(br.id);
+    push(lp.z, () => {
+      ctx.font = "600 13px " + theme.faceDisplay;
+      ctx.fillStyle = alpha(theme.ink, (on ? 0.55 : 0.2) * fade(lp.z));
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.save(); ctx.translate(lp.x, lp.y);
+      ctx.letterSpacing = "5px";
+      ctx.fillText(br.label.toUpperCase(), 0, 0);
+      ctx.restore();
+    });
+  });
+  CATEGORIES.forEach(c => {
+    const on = !filters.category.size || filters.category.has(c.id);
+    const pIn = project(Math.cos(c.a0) * inner * 0.6, 0, Math.sin(c.a0) * inner * 0.6);
+    const pOut = project(Math.cos(c.a0) * EQ, 0, Math.sin(c.a0) * EQ);
+    push((pIn.z + pOut.z) / 2, () => {
+      ctx.beginPath(); ctx.moveTo(pIn.x, pIn.y); ctx.lineTo(pOut.x, pOut.y);
+      ctx.strokeStyle = alpha(theme.rule2, 0.4 * fade(pOut.z)); ctx.lineWidth = 1;
+      ctx.setLineDash([2, 5]); ctx.stroke(); ctx.setLineDash([]);
+    });
+    const am = (c.a0 + c.a1) / 2;
+    const lp = project(Math.cos(am) * (EQ + 16), 0, Math.sin(am) * (EQ + 16));
+    push(lp.z, () => {
+      ctx.font = "600 9.5px " + theme.faceDisplay;
+      ctx.fillStyle = on ? alpha(theme.cat[c.idx], fade(lp.z)) : alpha(theme.dim, 0.3);
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(c.label.toUpperCase(), lp.x, lp.y);
+    });
+  });
+
+  /* --- maturity shells --- */
+  MATURITY.forEach((m, mi) => {
+    const r = inner + mi * step;
+    const on = !filters.maturity.size || filters.maturity.has(m.id);
+    for (let i = 0; i < SEGS; i++) {
+      const a = (i / SEGS) * Math.PI * 2, b = ((i + 1) / SEGS) * Math.PI * 2;
+      const pa = shellPoint(r, a, incAt(mi), nodeAt(mi));
+      const pb = shellPoint(r, b, incAt(mi), nodeAt(mi));
+      const p = project(pa.x, pa.y, pa.z), q = project(pb.x, pb.y, pb.z);
+      const mz = (p.z + q.z) / 2;
+      push(mz, () => {
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y);
+        ctx.strokeStyle = alpha(theme.rule2, (on ? 0.95 : 0.28) * fade(mz));
+        ctx.lineWidth = 1; ctx.stroke();
+      });
+    }
+    const lb = shellPoint(r, -Math.PI / 2, incAt(mi), nodeAt(mi));
+    const lp = project(lb.x, lb.y, lb.z);
+    push(lp.z - 1, () => {
+      ctx.font = "600 8.5px " + theme.faceDisplay;
+      ctx.fillStyle = alpha(theme.dim, (on ? 0.95 : 0.3) * fade(lp.z));
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(m.label.toUpperCase(), lp.x, lp.y - 8);
+    });
+  });
+
+  /* --- orgs --- */
+  bodies = [];
+  const buckets = new Map();
+  orgs.forEach(o => {
+    const key = o.category + "|" + o.maturity;
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(o);
+  });
+  buckets.forEach(group => {
+    const c = catOf(group[0].category);
+    const mi = matOf(group[0].maturity).ring;
+    const r = inner + mi * step;
+    const arc = c.a1 - c.a0;
+    // Longitude is fixed to the category wedge. Shells used to drift at their own
+    // rate, which looked like orbital motion but walked bodies out from under
+    // their own label — bearing is an encoding, not decoration.
+    group.forEach((o, j) => {
+      const frac = (j + 1) / (group.length + 1);
+      const theta = c.a0 + arc * (0.10 + frac * 0.80);
+      const sp = shellPoint(r, theta, incAt(mi), nodeAt(mi));
+      const p = project(sp.x, sp.y, sp.z);
+      bodies.push({ o, cat: c, p, scene: sp, on: passes(o) });
+    });
+  });
+
+  bodies.forEach(b => {
+    const dim = anyFilter && !b.on;
+    const rad = Math.max(1.8, (2.2 + (b.o.scale || 3) * 1.15) * b.p.s);
+    const col = theme.cat[b.cat.idx];
+    const lit = fade(b.p.z);
+    b.r = rad;
+    // Bias toward the viewer: in plan view everything is coplanar and would z-fight.
+    push(b.p.z - 1.5, () => {
+      if (selected === b.o.id) {
+        const foot = project(b.scene.x, 0, b.scene.z);
+        ctx.beginPath(); ctx.moveTo(b.p.x, b.p.y); ctx.lineTo(foot.x, foot.y);
+        ctx.strokeStyle = alpha(theme.accent, 0.45); ctx.lineWidth = 1;
+        ctx.setLineDash([2, 3]); ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(foot.x, foot.y, 2, 0, Math.PI * 2);
+        ctx.fillStyle = alpha(theme.accent, 0.6); ctx.fill();
+      }
+      ctx.beginPath(); ctx.arc(b.p.x, b.p.y, rad, 0, Math.PI * 2);
+      // Every body is filled. Maturity is already carried by the shell a body
+      // sits on, so it only needs a whisper here: shipping bodies glow, earlier
+      // ones sit slightly back and take a crisp rim instead.
+      const mr = matOf(b.o.maturity).ring;
+      if (!dim && mr >= 3 && !theme.light) { ctx.shadowColor = alpha(col, 0.9); ctx.shadowBlur = 12 * b.p.s; }
+      ctx.fillStyle = alpha(col, dim ? 0.16 : lit * (mr >= 3 ? 1 : mr === 2 ? 0.9 : 0.78));
+      ctx.fill(); ctx.shadowBlur = 0;
+      if (mr < 3) {
+        ctx.strokeStyle = alpha(col, dim ? 0.22 : Math.min(1, lit * 1.2));
+        ctx.lineWidth = 1.1; ctx.stroke();
+      }
+      if (selected === b.o.id) {
+        ctx.beginPath(); ctx.arc(b.p.x, b.p.y, rad + 7, 0, Math.PI * 2);
+        ctx.strokeStyle = theme.accent; ctx.lineWidth = 1.2; ctx.stroke();
+      }
+    });
+  });
+
+  /* --- core --- */
+  const core = project(0, 0, 0);
+  const coreR = inner * 0.40 * core.s;
+  push(core.z - 3, () => {
+    const g = ctx.createRadialGradient(core.x - coreR * .3, core.y - coreR * .4, coreR * .1, core.x, core.y, coreR);
+    g.addColorStop(0, alpha(theme.ink, theme.light ? 0.20 : 0.28));
+    g.addColorStop(1, theme.panel2);
+    ctx.beginPath(); ctx.arc(core.x, core.y, coreR, 0, Math.PI * 2);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = alpha(theme.rule2, 0.9); ctx.lineWidth = 1; ctx.stroke();
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = "500 " + Math.round(19 * core.s) + "px " + theme.faceData;
+    ctx.fillStyle = theme.ink; ctx.fillText(String(visible().length), core.x, core.y - 5 * core.s);
+    ctx.font = "600 " + Math.round(7.5 * core.s) + "px " + theme.faceDisplay;
+    ctx.fillStyle = theme.dim; ctx.fillText("IN VIEW", core.x, core.y + 10 * core.s);
+  });
+
+  prims.sort((a, b) => b.z - a.z);
+  for (let i = 0; i < prims.length; i++) prims[i].fn();
+
+  /* --- hover --- */
+  syncHover();
+  if (hovered) {
+    ctx.beginPath(); ctx.arc(hovered.p.x, hovered.p.y, hovered.r + 5, 0, Math.PI * 2);
+    ctx.strokeStyle = alpha(theme.ink, 0.6); ctx.lineWidth = 1; ctx.stroke();
+  }
+}
+
+// Hit-testing and the tooltip live outside the draw loop so a pointer move
+// updates them immediately rather than waiting on the next animation frame.
+function pickBody(pad) {
+  if (!mouse || dragging) return null;
+  const extra = pad || 0;
+  let best = Infinity, found = null;
+  bodies.forEach(b => {
+    const d = Math.hypot(b.p.x - mouse.x, b.p.y - mouse.y);
+    // Nearer bodies win ties, so the front of the sphere is what you grab.
+    if (d < Math.max(b.r + 7, 13) + extra && d - b.p.s * 3 < best) { best = d - b.p.s * 3; found = b; }
+  });
+  return found;
+}
+function dismissCard() {
+  mouse = null; hovered = null; tipHot = false;
+  cancelHideTip(); hideTip();
+}
+
+function disarmTip() {
+  tipArmed = false; tip.classList.remove("armed");
+  clearTimeout(armT); armT = null;
+}
+function scheduleArmTip() {
+  clearTimeout(armT);
+  armT = setTimeout(() => { tipArmed = true; tip.classList.add("armed"); }, ARM_MS);
+}
+function hideTip() {
+  tip.classList.remove("on"); tipFor = null; tipOrg = null; tipHideT = null;
+  disarmTip();
+}
+function cancelHideTip() { clearTimeout(tipHideT); tipHideT = null; }
+function scheduleHideTip() {
+  if (tipHideT || !tip.classList.contains("on")) return;   // already counting down
+  tipHideT = setTimeout(hideTip, 300);                     // grace period to reach the card
+}
+tip.addEventListener("pointerenter", () => { tipHot = true; cancelHideTip(); });
+tip.addEventListener("pointerleave", () => { tipHot = false; scheduleHideTip(); });
+document.getElementById("t-close").addEventListener("click", dismissCard);
+// A tap anywhere that is neither the card nor the chart closes it. The chart has
+// its own handling, and without this the card covers its own dismiss target.
+document.addEventListener("pointerdown", ev => {
+  if (!tip.classList.contains("on")) return;
+  if (tip.contains(ev.target) || ev.target === cv) return;
+  dismissCard();
+}, true);
+
+document.getElementById("t-details").addEventListener("click", () => {
+  if (!tipOrg) return;
+  selected = tipOrg.id; dismissCard(); renderList(); renderDetail();
+  detailEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+});
+
+function syncHover() {
+  hovered = pickBody();
+  // Keep the card up while the pointer is inside it, or briefly after leaving a body.
+  if (!hovered) { if (!tipHot) scheduleHideTip(); return; }
+  cancelHideTip();
+  const rect = cv.getBoundingClientRect(), pr = cv.parentElement.getBoundingClientRect();
+  const x = rect.left - pr.left + hovered.p.x, y = rect.top - pr.top + hovered.p.y;
+  // Flip under the body when it would overflow the top, and keep the card's full
+  // width inside the chart area so it is never cut off at an edge.
+  const cardW = tip.offsetWidth || 326, cardH = tip.offsetHeight || 200;
+  tip.classList.toggle("below", y - cardH - 18 < 0);
+  const half = cardW / 2;
+  tip.style.left = Math.max(half + 6, Math.min(pr.width - half - 6, x)) + "px";
+  tip.style.top = y + "px";
+  if (tipFor !== hovered.o.id) {            // only touch the DOM when the target changes
+    tipFor = hovered.o.id;
+    disarmTip(); scheduleArmTip();
+    const o = hovered.o, col = theme.cat[hovered.cat.idx];
+    tipOrg = o;
+    const link = document.getElementById("t-link");
+    link.classList.toggle("is-hidden", !o.url);
+    if (o.url) link.href = o.url;
+    const fallback = glyphFor(o.category, col, 30);
+    const fig = tip.querySelector(".t-fig");
+    fig.innerHTML = fallback;
+    if (o.image) {                          // swap in the photo only once it loads
+      const img = new Image();
+      img.alt = o.name;
+      img.onload = () => { if (tipFor === o.id) { fig.innerHTML = ""; fig.appendChild(img); } };
+      img.src = o.image;
+    }
+    const m = matOf(o.maturity), cat = hovered.cat, ev = (o.evidence || []).length;
+    audioPing(m.ring);
+    document.getElementById("t-body").innerHTML = `
+      <div class="t-title">${esc(o.name)}</div>
+      <div class="t-meta">${esc(cat.label.toUpperCase())} · ${cat.branch === "models" ? "MODELS" : "HARDWARE"}${o.hq ? " · " + esc(o.hq.toUpperCase()) : ""}</div>
+      ${o.note ? `<div class="t-note">${esc(o.note)}</div>` : ""}
+      <dl class="t-kv">
+        <dt>Maturity</dt><dd>${esc(m.label)} <span class="t-dim">— ${esc(m.blurb)}</span></dd>
+        <dt>Scale</dt><dd>${"◆".repeat(o.scale || 0)}${"◇".repeat(5 - (o.scale || 0))}</dd>
+        ${(o.tags && o.tags.length) ? `<dt>Tags</dt><dd>${esc(o.tags.join(", "))}</dd>` : ""}
+        <dt>Sources</dt><dd>${ev ? ev + " attached" : '<span class="t-dim">none yet</span>'}</dd>
+      </dl>`;
+  }
+  if (!tipArmed && !armT) scheduleArmTip();
+  tip.classList.add("on");
+}
+
+function frame(t) {
+  const dt = Math.min(0.05, (t - last) / 1000 || 0);
+  last = t; draw(dt); requestAnimationFrame(frame);
+}
+
+/* ---------- camera ---------- */
+// Touch has no hover phase, so a finger never "moves over" a body before
+// pressing it. Active pointers are tracked so a tap can hit-test where it lifts,
+// and so two fingers can pinch — wheel events never fire on a touchscreen.
+const touches = new Map();
+let pinch = null, hadPinch = false;
+
+function pinchGeom() {
+  const [a, b] = [...touches.values()];
+  return {
+    dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+    mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2
+  };
+}
+
+cv.addEventListener("pointerdown", ev => {
+  const r = cv.getBoundingClientRect();
+  // Drop any pointer we captured but no longer hold: that pointer is gone and
+  // its release was never delivered. Without this a single lost pointerup wedges
+  // the gesture state permanently — every later finger reads as half a pinch.
+  for (const id of [...touches.keys()]) {
+    if (id !== ev.pointerId && cv.hasPointerCapture && !cv.hasPointerCapture(id)) touches.delete(id);
+  }
+  if (touches.size === 0) { pinch = null; hadPinch = false; }
+  touches.set(ev.pointerId, { x: ev.clientX - r.left, y: ev.clientY - r.top });
+  // Capture EVERY pointer, including the second finger. Without this its
+  // pointerup is delivered elsewhere, the entry never leaves `touches`, and from
+  // then on every tap is suppressed and every finger is read as half a pinch.
+  try { cv.setPointerCapture(ev.pointerId); } catch (e) {}
+  if (touches.size >= 2) {                  // two fingers: pinch to zoom, drag to pan
+    const g = pinchGeom();
+    pinch = { dist: g.dist, mx: g.mx, my: g.my, zoom: cam.zoom, panX: cam.panX, panY: cam.panY };
+    hadPinch = true;
+    endDrag(ev);
+    return;
+  }
+  dragging = true; dragMoved = false; dragPrev = { x: ev.clientX, y: ev.clientY };
+  dragMode = (ev.shiftKey || ev.button === 1) ? "pan" : "orbit";
+  cv.classList.add("dragging"); cv.classList.toggle("panning", dragMode === "pan");
+});
+
+cv.addEventListener("pointermove", ev => {
+  const r = cv.getBoundingClientRect();
+  const now = performance.now();
+  const pt = { x: ev.clientX - r.left, y: ev.clientY - r.top };
+  if (touches.has(ev.pointerId)) touches.set(ev.pointerId, pt);
+
+  if (pinch && touches.size >= 2) {         // pinch to zoom, and drag the midpoint to pan
+    const g = pinchGeom();
+    const want = pinch.zoom * (g.dist / pinch.dist);
+    cam.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, want));
+    const k = cam.zoom / pinch.zoom;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    const ox = w / 2 + pinch.panX, oy = h / 2 + pinch.panY;
+    cam.panX = g.mx - k * (pinch.mx - ox) - w / 2;
+    cam.panY = g.my - k * (pinch.my - oy) - h / 2;
+    clampPan();
+    idleSince = performance.now();
+    return;
+  }
+
+  if (lastMovePt) {
+    const dt = now - lastMoveAt;
+    const dist = Math.hypot(pt.x - lastMovePt.x, pt.y - lastMovePt.y);
+    // Moving through rather than settling: keep the card out of the way. A jump
+    // with no measurable time between samples is infinitely fast, not stationary.
+    const sweeping = dt > 0 ? dist / dt > SWEEP_SPEED : dist > 6;
+    if (sweeping && tipArmed) { disarmTip(); scheduleArmTip(); }
+  }
+  lastMovePt = pt; lastMoveAt = now;
+  mouse = pt;
+  if (!dragging) syncHover();
+  if (!dragging || !dragPrev) return;
+  const dx = ev.clientX - dragPrev.x, dy = ev.clientY - dragPrev.y;
+  // A finger wobbles more than a mouse, so it needs more room before a press
+  // counts as a drag rather than a tap.
+  const slop = ev.pointerType === "touch" ? 9 : 3;
+  if (Math.abs(dx) + Math.abs(dy) > slop) dragMoved = true;
+  if (dragMode === "pan") {
+    cam.panX += dx; cam.panY += dy; clampPan();
+  } else {
+    cam.yaw += dx * 0.008;
+    cam.pitch = Math.max(-TOPDOWN, Math.min(TOPDOWN, cam.pitch + dy * 0.008));
+  }
+  dragPrev = { x: ev.clientX, y: ev.clientY };
+  idleSince = performance.now();
+});
+
+function endDrag(ev) {
+  if (!dragging) return;
+  dragging = false; cv.classList.remove("dragging", "panning"); idleSince = performance.now();
+  if (ev && cv.hasPointerCapture && cv.hasPointerCapture(ev.pointerId)) {
+    try { cv.releasePointerCapture(ev.pointerId); } catch (e) {}
+  }
+}
+
+cv.addEventListener("pointerup", ev => {
+  // hadPinch outlives pinch itself: by the second finger's release pinch is
+  // already cleared, and without this that release registers as a tap.
+  const wasDrag = dragMoved, wasPinch = !!pinch || hadPinch;
+  touches.delete(ev.pointerId);
+  if (touches.size < 2) pinch = null;
+  if (touches.size === 0) hadPinch = false;
+  endDrag(ev);
+  if (wasDrag || wasPinch || touches.size) return;
+  if (ev.pointerType === "touch") {
+    // No hover happened, so hit-test at the point the finger lifted. A hit opens
+    // the card immediately — there is no dwell to wait for on touch.
+    const r = cv.getBoundingClientRect();
+    mouse = { x: ev.clientX - r.left, y: ev.clientY - r.top };
+    const b = pickBody(14);   // fingertip, not cursor
+    if (b) {
+      cancelHideTip(); syncHover();
+      tipArmed = true; tip.classList.add("armed");
+      selected = b.o.id; renderList(); renderDetail();
+    } else {
+      mouse = null; hovered = null; hideTip();
+    }
+    return;
+  }
+  if (hovered) { selected = hovered.o.id; renderList(); renderDetail(); }
+});
+
+function releasePointer(ev) {
+  touches.delete(ev.pointerId);
+  if (touches.size < 2) pinch = null;
+  if (touches.size === 0) hadPinch = false;
+  endDrag(ev);
+}
+cv.addEventListener("pointercancel", releasePointer);
+// Backstop: if a pointer is lost without a clean up event, drop it anyway.
+cv.addEventListener("lostpointercapture", ev => {
+  if (touches.has(ev.pointerId)) releasePointer(ev);
+});
+
+cv.addEventListener("pointerleave", ev => {
+  // Touch fires this the moment the finger lifts; the card should stay put.
+  if (ev.pointerType === "touch") return;
+  mouse = null; hovered = null; if (!tipHot) scheduleHideTip();
+});
+cv.addEventListener("wheel", ev => {
+  ev.preventDefault();
+  const from = cam.zoom;
+  const to = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, from * (ev.deltaY > 0 ? 0.90 : 1.111)));
+  const k = to / from;
+  // Magnify about the pointer, not the middle: at high zoom, centre-anchored
+  // zoom means constantly panning back to whatever you were looking at.
+  if (k !== 1 && mouse) {
+    const w = cv.clientWidth, h = cv.clientHeight;
+    const ox = w / 2 + cam.panX, oy = h / 2 + cam.panY;
+    cam.panX = mouse.x - k * (mouse.x - ox) - w / 2;
+    cam.panY = mouse.y - k * (mouse.y - oy) - h / 2;
+  }
+  cam.zoom = to;
+  clampPan();
+  idleSince = performance.now();
+}, { passive: false });
+
+const shiftCue = ev => cv.classList.toggle("pan-ready", ev.shiftKey && !dragging);
+addEventListener("keydown", shiftCue);
+addEventListener("keyup", shiftCue);
+addEventListener("blur", () => cv.classList.remove("pan-ready"));
+
+const fullBtn = document.getElementById("btn-full");
+const chartSide = document.querySelector(".chart-side");
+function setImmersive(on) {
+  document.body.classList.toggle("immersive", on);
+  fullBtn.textContent = on ? "Exit full screen" : "Full screen";
+  fullBtn.setAttribute("aria-pressed", String(on));
+  // The canvas is measured from its container every frame, so it resizes itself.
+}
+fullBtn.addEventListener("click", () => {
+  const on = !document.body.classList.contains("immersive");
+  setImmersive(on);
+  // Ask for real fullscreen too where it exists, purely to hide browser chrome.
+  try {
+    if (on && chartSide.requestFullscreen) chartSide.requestFullscreen().catch(() => {});
+    else if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  } catch (e) {}
+});
+// Leaving native fullscreen by any route (Esc, gesture) must drop the CSS mode too.
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement && document.body.classList.contains("immersive")) setImmersive(false);
+});
+addEventListener("keydown", ev => {
+  if (ev.key === "Escape" && document.body.classList.contains("immersive") && !document.fullscreenElement) setImmersive(false);
+});
+
+document.getElementById("btn-reset").addEventListener("click", () => {
+  cam.yaw = HOME.yaw; cam.pitch = HOME.pitch; cam.zoom = HOME.zoom;
+  cam.panX = HOME.panX; cam.panY = HOME.panY; idleSince = performance.now();
+});
+document.getElementById("btn-spin").addEventListener("click", ev => {
+  spinning = !spinning; ev.currentTarget.textContent = spinning ? "Pause" : "Resume";
+});
+
+/* ---------- panel ---------- */
+const listEl = document.getElementById("list");
+const detailEl = document.getElementById("detail");
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
+
+function renderList() {
+  const items = visible().slice().sort((a, b) =>
+    (b.scale || 0) - (a.scale || 0) || a.name.localeCompare(b.name));
+  if (!items.length) {
+    listEl.innerHTML = '<p class="empty">Nothing in view. Loosen the filters, or add an organization.</p>';
+    return;
+  }
+  listEl.innerHTML = items.map(o => {
+    const c = catOf(o.category);
+    return `<div class="row" data-id="${o.id}" aria-current="${selected === o.id}">
+      <span class="row-bar" style="background:${theme.cat[c.idx]}"></span>
+      <span class="row-glyph">${glyphFor(o.category, theme.cat[c.idx], 20)}</span>
+      <button class="row-open" data-id="${o.id}">
+        <span class="row-title">${esc(o.name)}</span>
+        <span class="row-meta">${esc(c.label.toUpperCase())}${o.hq ? " · " + esc(o.hq) : ""}${(o.evidence||[]).length ? " · " + o.evidence.length + " SRC" : ""}</span>
+      </button>
+      <span class="row-mat">${esc(matOf(o.maturity).label)}</span>
+      ${o.url ? `<a class="row-link" href="${esc(o.url)}" target="_blank" rel="noopener noreferrer"
+         title="Open ${esc(o.name)}" aria-label="Open ${esc(o.name)} in a new tab">↗</a>`
+        : `<span class="row-link is-empty" aria-hidden="true">·</span>`}
+    </div>`;
+  }).join("");
+  listEl.querySelectorAll(".row-open").forEach(r => r.addEventListener("click", () => {
+    selected = r.dataset.id; renderList(); renderDetail();
+    detailEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }));
+}
+
+function renderDetail() {
+  const o = orgs.find(x => x.id === selected);
+  if (!o) { detailEl.hidden = true; return; }
+  detailEl.hidden = false;
+  const c = catOf(o.category), m = matOf(o.maturity);
+  const ev = o.evidence || [];
+  detailEl.innerHTML = `
+    <div class="d-head">
+      <div class="d-fig">${o.image
+        ? `<img src="${esc(o.image)}" alt="${esc(o.name)}">`
+        : glyphFor(o.category, theme.cat[c.idx], 42)}</div>
+      <h2>${o.url
+        ? `<a href="${esc(o.url)}" target="_blank" rel="noopener noreferrer">${esc(o.name)} <span class="d-ext">↗</span></a>`
+        : esc(o.name)}</h2>
+    </div>
+    ${o.note ? `<p class="note">${esc(o.note)}</p>` : ""}
+    <dl class="kv">
+      <dt>Builds</dt><dd><span style="color:${theme.cat[c.idx]}">${esc(c.label)}</span></dd>
+      <dt>Branch</dt><dd>${esc(c.branch === "models" ? "Models" : "Hardware")}</dd>
+      <dt>Maturity</dt><dd>${esc(m.label)} — ${esc(m.blurb)}</dd>
+      <dt>Scale</dt><dd>${"◆".repeat(o.scale || 0)}${"◇".repeat(5 - (o.scale || 0))}</dd>
+      ${o.hq ? `<dt>Based in</dt><dd>${esc(o.hq)}</dd>` : ""}
+      ${(o.tags && o.tags.length) ? `<dt>Tags</dt><dd>${esc(o.tags.join(", "))}</dd>` : ""}
+    </dl>
+    <div class="ev-head">Sources — ${ev.length || "none yet"}</div>
+    ${ev.length ? `<div class="ev">${ev.map((e, i) => `
+      <div class="ev-item">
+        <span>${e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>` : esc(e.title)}${e.note ? ` <span style="color:var(--ink-dim)">— ${esc(e.note)}</span>` : ""}</span>
+        <span class="ev-date">${esc(e.date || "")} <button data-drop="${i}" title="Remove">✕</button></span>
+      </div>`).join("")}</div>`
+      : `<p class="ev-none">Nothing attached. Papers, demos, and posts you read about them land here.</p>`}
+    <div class="detail-acts">
+      <button data-act="source">+ Attach source</button>
+      <button data-act="close">Close</button>
+      <button data-act="edit">Edit</button>
+      ${m.ring < 4 ? `<button data-act="advance">Advance to ${esc(MATURITY[m.ring + 1].label)}</button>` : ""}
+      <button data-act="delete">Delete</button>
+    </div>`;
+  detailEl.querySelectorAll("[data-act]").forEach(b => b.addEventListener("click", () => {
+    const act = b.dataset.act;
+    if (act === "close") { selected = null; renderList(); renderDetail(); }
+    else if (act === "edit") openOrgDialog(o);
+    else if (act === "source") openEvDialog(o);
+    else if (act === "advance") { o.maturity = MATURITY[matOf(o.maturity).ring + 1].id; commit(); }
+    else if (act === "delete") {
+      if (!confirm("Remove “" + o.name + "” from the map?")) return;
+      rememberRemoved(o.name);
+      orgs = orgs.filter(x => x.id !== o.id); selected = null; commit();
+    }
+  }));
+  detailEl.querySelectorAll("[data-drop]").forEach(b => b.addEventListener("click", () => {
+    o.evidence.splice(parseInt(b.dataset.drop, 10), 1); commit();
+  }));
+}
+
+function renderReadouts() {
+  const vis = visible();
+  document.getElementById("r-total").textContent = orgs.length;
+  document.getElementById("r-ship").textContent = orgs.filter(o => matOf(o.maturity).ring >= 3).length;
+  document.getElementById("r-proto").textContent = orgs.filter(o => matOf(o.maturity).ring <= 1).length;
+  const n = filters.branch.size + filters.maturity.size + filters.category.size;
+  document.getElementById("hud-filter").textContent =
+    (n || query) ? `FILTERED · ${vis.length} OF ${orgs.length} SHOWN` : "";
+}
+
+function renderProfile() {
+  const host = document.getElementById("profile");
+  const vis = visible();
+  host.innerHTML = MATURITY.map(m => {
+    const inShell = vis.filter(o => o.maturity === m.id);
+    const byCat = CATEGORIES.map(c => ({ c, n: inShell.filter(o => o.category === c.id).length })).filter(x => x.n);
+    const total = inShell.length || 1;
+    return `<div class="pcell">
+      <b>${inShell.length}</b>
+      <div class="pbar">${byCat.map(x =>
+        `<span style="width:${(x.n / total) * 100}%;background:${theme.cat[x.c.idx]}" title="${esc(x.c.label)}: ${x.n}"></span>`).join("")}</div>
+      <em>${esc(m.label)}</em>
+    </div>`;
+  }).join("");
+}
+
+function commit() { save(); renderAll(); }
+function renderAll() { renderList(); renderDetail(); renderReadouts(); renderProfile(); }
+
+/* ---------- filters ---------- */
+function buildChips(host, set, opts, getLabel, getVal) {
+  host.innerHTML = opts.map(o => `<button class="chip" data-v="${esc(getVal(o))}" aria-pressed="false">${esc(getLabel(o))}</button>`).join("");
+  host.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => {
+    const v = b.dataset.v;
+    if (set.has(v)) set.delete(v); else set.add(v);
+    b.setAttribute("aria-pressed", set.has(v));
+    renderAll();
+  }));
+}
+buildChips(document.getElementById("chips-branch"), filters.branch, BRANCHES, b => b.label, b => b.id);
+buildChips(document.getElementById("chips-maturity"), filters.maturity, MATURITY, m => m.label, m => m.id);
+
+const legend = document.getElementById("legend");
+function paintLegend() {
+  legend.innerHTML = CATEGORIES.map(c =>
+    `<button class="lg" data-v="${c.id}" aria-pressed="${!filters.category.size || filters.category.has(c.id)}"><i style="background:${theme.cat[c.idx]}"></i>${esc(c.label)}</button>`).join("");
+  legend.querySelectorAll(".lg").forEach(b => b.addEventListener("click", () => {
+    const v = b.dataset.v;
+    if (filters.category.has(v)) filters.category.delete(v); else filters.category.add(v);
+    paintLegend(); renderAll();
+  }));
+}
+paintLegend();
+
+document.getElementById("search").addEventListener("input", ev => {
+  query = ev.target.value.trim().toLowerCase(); renderAll();
+});
+
+/* ---------- org dialog ---------- */
+const dlg = document.getElementById("dlg");
+const F = {
+  name: document.getElementById("f-name"), branch: document.getElementById("f-branch"),
+  cat: document.getElementById("f-cat"), mat: document.getElementById("f-mat"),
+  scale: document.getElementById("f-scale"), hq: document.getElementById("f-hq"),
+  url: document.getElementById("f-url"), image: document.getElementById("f-image"),
+  tags: document.getElementById("f-tags"),
+  note: document.getElementById("f-note")
+};
+F.branch.innerHTML = BRANCHES.map(b => `<option value="${b.id}">${b.label}</option>`).join("");
+F.mat.innerHTML = MATURITY.map(m => `<option value="${m.id}">${m.label}</option>`).join("");
+function fillCats(branch, pick) {
+  const list = CATEGORIES.filter(c => c.branch === branch);
+  F.cat.innerHTML = list.map(c => `<option value="${c.id}">${esc(c.label)}</option>`).join("");
+  F.cat.value = (pick && list.some(c => c.id === pick)) ? pick : list[0].id;
+}
+F.branch.addEventListener("change", () => fillCats(F.branch.value));
+
+function openOrgDialog(o) {
+  editing = o || null;
+  document.getElementById("dlg-title").textContent = o ? "Edit organization" : "Add organization";
+  const c = o ? catOf(o.category) : CATEGORIES[0];
+  F.name.value = o ? o.name : "";
+  F.branch.value = c.branch;
+  fillCats(c.branch, o ? o.category : null);
+  F.mat.value = o ? o.maturity : "prototype";
+  F.scale.value = o ? (o.scale || 3) : 3;
+  F.hq.value = o ? (o.hq || "") : "";
+  F.url.value = o ? (o.url || "") : "";
+  F.image.value = o ? (o.image || "") : "";
+  F.tags.value = o ? (o.tags || []).join(", ") : "";
+  F.note.value = o ? (o.note || "") : "";
+  dlg.showModal(); F.name.focus();
+}
+document.getElementById("org-form").addEventListener("submit", ev => {
+  ev.preventDefault();
+  const data = {
+    name: F.name.value.trim(), category: F.cat.value, maturity: F.mat.value,
+    scale: Math.max(1, Math.min(5, parseInt(F.scale.value, 10) || 3)),
+    hq: F.hq.value.trim(), url: F.url.value.trim(), image: F.image.value.trim(),
+    tags: F.tags.value.split(",").map(t => t.trim()).filter(Boolean),
+    note: F.note.value.trim()
+  };
+  if (!data.name) return;
+  if (editing) Object.assign(editing, data);
+  else { const rec = Object.assign({ id: uid(), evidence: [] }, data); orgs.push(rec); selected = rec.id; }
+  dlg.close(); commit();
+});
+document.getElementById("btn-cancel").addEventListener("click", () => dlg.close());
+document.getElementById("btn-add").addEventListener("click", () => openOrgDialog(null));
+
+/* ---------- source dialog ---------- */
+const evDlg = document.getElementById("ev-dlg");
+let evTarget = null;
+function openEvDialog(o) {
+  evTarget = o;
+  document.getElementById("ev-dlg-title").textContent = "Attach a source to " + o.name;
+  document.getElementById("v-title").value = "";
+  document.getElementById("v-url").value = "";
+  document.getElementById("v-date").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("v-note").value = "";
+  evDlg.showModal(); document.getElementById("v-title").focus();
+}
+document.getElementById("ev-form").addEventListener("submit", ev => {
+  ev.preventDefault();
+  const title = document.getElementById("v-title").value.trim();
+  if (!title || !evTarget) return;
+  if (!evTarget.evidence) evTarget.evidence = [];
+  evTarget.evidence.unshift({
+    title, url: document.getElementById("v-url").value.trim(),
+    date: document.getElementById("v-date").value,
+    note: document.getElementById("v-note").value.trim()
+  });
+  evDlg.close(); commit();
+});
+document.getElementById("ev-cancel").addEventListener("click", () => evDlg.close());
+
+/* ---------- import / export ---------- */
+document.getElementById("btn-export").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(orgs, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "observatory-orgs-" + new Date().toISOString().slice(0, 10) + ".json";
+  a.click(); URL.revokeObjectURL(a.href);
+});
+const fileIn = document.getElementById("file-in");
+document.getElementById("btn-import").addEventListener("click", () => fileIn.click());
+fileIn.addEventListener("change", () => {
+  const f = fileIn.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const parsed = JSON.parse(rd.result);
+      if (!Array.isArray(parsed)) throw new Error("shape");
+      const seen = new Set(orgs.map(o => o.name.toLowerCase()));
+      parsed.forEach(p => {
+        if (!p || !p.name || seen.has(String(p.name).toLowerCase())) return;
+        orgs.push(Object.assign({ id: uid(), category: "foundation", maturity: "prototype", scale: 3, tags: [], evidence: [] }, p));
+      });
+      commit();
+    } catch (err) {
+      alert("That file isn't a valid Observatory export. Expected a JSON array of organizations.");
+    }
+    fileIn.value = "";
+  };
+  rd.readAsText(f);
+});
+
+document.addEventListener("keydown", ev => {
+  const typing = /input|textarea|select/i.test(ev.target.tagName);
+  if (ev.key === "n" && !typing && !dlg.open && !evDlg.open) { ev.preventDefault(); openOrgDialog(null); }
+  if (ev.key === "/" && !typing) { ev.preventDefault(); document.getElementById("search").focus(); }
+});
+
+/* ---------- sound ----------
+   Generated, not sampled: a slow drone, a drifting pad, and sparse bell tones.
+   Bell pitch is drawn from what is currently on screen — filter down to the
+   outer shells and the music sits lower and thins out. Never autoplays. */
+const SCALE = [0, 3, 5, 7, 10];          // D minor pentatonic
+const ROOT = 73.42;                      // D2
+const CHORDS = [[0, 3, 7], [8, 12, 15], [3, 7, 10], [5, 8, 12]];
+const AU = { ctx: null, on: false, master: null, verb: null, nodes: [], timers: [], chord: 0 };
+
+function makeIR(ctx, secs, decay) {
+  const len = Math.floor(ctx.sampleRate * secs);
+  const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+  }
+  return buf;
+}
+const hz = (oct, deg) => ROOT * Math.pow(2, oct) * Math.pow(2, SCALE[deg] / 12);
+
+function audioOn() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return false;
+  const ctx = new Ctx();
+  AU.ctx = ctx;
+  // Mobile hands back a suspended context even inside a gesture, so it must be
+  // resumed explicitly and from within that same gesture. Desktop starts running
+  // on its own, which is why this only ever failed on a phone.
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  if (ctx.addEventListener) ctx.addEventListener("statechange", syncSoundBtn);
+
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0, ctx.currentTime);
+  master.gain.linearRampToValueAtTime(0.8, ctx.currentTime + 3);   // fade in
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -12; limiter.ratio.value = 12;
+  // Phone speakers reproduce almost nothing below ~500Hz. Rolling off the very
+  // bottom stops the limiter spending its headroom on content nobody can hear.
+  const hp = ctx.createBiquadFilter();
+  hp.type = "highpass"; hp.frequency.value = 110;
+  master.connect(hp).connect(limiter).connect(ctx.destination);
+  AU.master = master;
+
+  const verb = ctx.createConvolver();
+  verb.buffer = makeIR(ctx, 5.5, 2.6);
+  const verbGain = ctx.createGain(); verbGain.gain.value = 0.55;
+  verb.connect(verbGain).connect(master);
+  AU.verb = verb;
+
+  // drone: root and fifth, barely moving
+  const lp = ctx.createBiquadFilter();
+  lp.type = "lowpass"; lp.frequency.value = 700; lp.Q.value = 3;
+  const dg = ctx.createGain(); dg.gain.value = 0.10;
+  lp.connect(dg).connect(master);
+  // An octave up from where this started: D3/A3/D4 rather than D2, so there is
+  // something left after a small speaker's roll-off.
+  [ROOT * 2, ROOT * 3, ROOT * 4.01].forEach((f, i) => {
+    const o = ctx.createOscillator();
+    o.type = i === 2 ? "triangle" : "sine";
+    o.frequency.value = f;
+    o.connect(lp); o.start();
+    AU.nodes.push(o);
+  });
+  const lfo = ctx.createOscillator(), lfoGain = ctx.createGain();
+  lfo.frequency.value = 0.035; lfoGain.gain.value = 260;
+  lfo.connect(lfoGain).connect(lp.frequency); lfo.start();
+  AU.nodes.push(lfo);
+
+  const pad = () => {
+    if (!AU.on) return;
+    const t = ctx.currentTime, chord = CHORDS[AU.chord++ % CHORDS.length];
+    chord.forEach(semi => {
+      const o = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter();
+      o.type = "triangle";
+      o.frequency.value = ROOT * 4 * Math.pow(2, semi / 12);
+      o.detune.value = (Math.random() * 12) - 6;
+      f.type = "lowpass"; f.frequency.value = 1800;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.055, t + 7);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 20);
+      o.connect(f).connect(g); g.connect(master); g.connect(verb);
+      o.start(t); o.stop(t + 21);
+    });
+    AU.timers.push(setTimeout(pad, 18000));
+  };
+
+  const bell = () => {
+    if (!AU.on) return;
+    const t = ctx.currentTime;
+    // octave follows a maturity shell that is actually visible right now
+    const vis = visible();
+    const ring = vis.length ? matOf(vis[Math.floor(Math.random() * vis.length)].maturity).ring : 2;
+    const o = ctx.createOscillator(), g = ctx.createGain(), pan = ctx.createStereoPanner();
+    o.type = "sine";
+    o.frequency.value = hz(4 - Math.floor(ring / 2), Math.floor(Math.random() * SCALE.length));
+    pan.pan.value = Math.random() * 1.6 - 0.8;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.15, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 5);
+    o.connect(g).connect(pan); pan.connect(master); pan.connect(verb);
+    o.start(t); o.stop(t + 5.2);
+    AU.timers.push(setTimeout(bell, 2600 + Math.random() * 4800));
+  };
+
+  AU.on = true;
+  // Two quick notes when sound is switched on. Without this, silence is
+  // ambiguous — blocked, muted, or simply too quiet to notice.
+  [[660, 0.06], [990, 0.30]].forEach(([f, at]) => {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = "triangle"; o.frequency.value = f;
+    const t0 = ctx.currentTime + at;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.22, t0 + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
+    o.connect(g); g.connect(master); g.connect(verb);
+    o.start(t0); o.stop(t0 + 0.55);
+  });
+  pad(); AU.timers.push(setTimeout(bell, 2000));
+  return true;
+}
+
+function audioOff() {
+  AU.on = false;
+  AU.timers.forEach(clearTimeout); AU.timers = [];
+  AU.nodes.forEach(n => { try { n.stop(); } catch (e) {} }); AU.nodes = [];
+  if (AU.ctx) {
+    const ctx = AU.ctx, m = AU.master;
+    try {
+      m.gain.cancelScheduledValues(ctx.currentTime);
+      m.gain.setValueAtTime(m.gain.value, ctx.currentTime);
+      m.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.6);
+    } catch (e) {}
+    setTimeout(() => { try { ctx.close(); } catch (e) {} }, 900);
+    AU.ctx = null; AU.master = null; AU.verb = null;
+  }
+}
+
+// A short tone when the pointer lands on a body: pitch rises toward the centre.
+function audioPing(ring) {
+  if (!AU.on || !AU.ctx) return;
+  const ctx = AU.ctx, t = ctx.currentTime;
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = "sine";
+  o.frequency.value = hz(4 - Math.floor(ring / 2), (4 - ring + 5) % SCALE.length);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.05, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+  o.connect(g); g.connect(AU.master); g.connect(AU.verb);
+  o.start(t); o.stop(t + 1);
+}
+
+const soundBtn = document.getElementById("btn-sound");
+// Backgrounding a tab on a phone suspends the context; pick it back up on return.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && AU.on && AU.ctx && AU.ctx.state === "suspended") {
+    AU.ctx.resume().then(syncSoundBtn).catch(() => {});
+  }
+});
+soundBtn.addEventListener("click", () => {
+  if (AU.on) { audioOff(); syncSoundBtn(); }
+  else if (audioOn()) { syncSoundBtn(); setTimeout(syncSoundBtn, 400); }
+  else { soundBtn.textContent = "No audio"; soundBtn.disabled = true; }
+  try { localStorage.setItem("observatory.sound", AU.on ? "on" : "off"); } catch (e) {}
+});
+function syncSoundBtn() {
+  const live = AU.on && AU.ctx && AU.ctx.state === "running";
+  soundBtn.textContent = live ? "Mute" : "Sound";
+  soundBtn.setAttribute("aria-pressed", String(!!live));
+  // Claiming "Mute" while the context is parked is worse than saying nothing.
+  soundBtn.title = (AU.on && !live) ? "Audio is blocked — tap again, and check the ringer switch" : "";
+}
+function soundStarted() { syncSoundBtn(); }
+
+// Ask a throwaway context whether this browser will let audio run without a
+// gesture. Probing first avoids building the real graph in a suspended context,
+// where the schedulers would keep firing against a frozen clock and dump every
+// queued note at once on resume.
+async function autoplayAllowed() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return false;
+  let probe = null;
+  try {
+    probe = new Ctx();
+    // A blocked resume() never settles — it just waits for a gesture that may
+    // never come — so it must be raced or this promise hangs and the gesture
+    // fallback is never armed.
+    if (probe.state === "suspended") {
+      await Promise.race([probe.resume(), new Promise(r => setTimeout(r, 300))]);
+    }
+    const ok = probe.state === "running";
+    probe.close();
+    return ok;
+  } catch (e) {
+    if (probe) { try { probe.close(); } catch (e2) {} }
+    return false;
+  }
+}
+
+// On unless muted. Play immediately where the browser permits it; otherwise the
+// first gesture starts it, which is the most any page is allowed to do.
+let soundPref = "on";
+try { soundPref = localStorage.getItem("observatory.sound") || "on"; } catch (e) {}
+if (soundPref !== "off") {
+  const disarm = () => {
+    removeEventListener("pointerdown", arm); removeEventListener("keydown", arm);
+    removeEventListener("touchend", arm); removeEventListener("click", arm);
+  };
+  function arm(ev) {
+    // If that gesture was aimed at the toggle, let the toggle decide instead of
+    // racing it — otherwise it would start here and immediately be switched off.
+    const onBtn = ev.target && ev.target.closest && ev.target.closest("#btn-sound");
+    disarm();
+    if (onBtn || AU.on) return;
+    if (audioOn()) soundStarted();
+  }
+  autoplayAllowed().then(ok => {
+    if (ok && audioOn()) { soundStarted(); return; }
+    addEventListener("pointerdown", arm); addEventListener("keydown", arm);
+    addEventListener("touchend", arm); addEventListener("click", arm);
+    soundBtn.title = "Your browser blocks audio until you interact with the page — "
+      + "sound starts on your first tap";
+  });
+}
+
+/* ---------- go ---------- */
+load(); renderAll(); idleSince = performance.now();
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
